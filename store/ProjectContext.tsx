@@ -97,103 +97,123 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  // 1. Initial Auth Check & User Data Load
+  // 1. Initial Auth & Data Load
   useEffect(() => {
-    let subscription: any;
-    
-    const initAuth = async () => {
-      if (isSupabaseConfigured) {
-        // Listen for auth changes
-        const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-             if (session?.user) {
-                 // Fetch full profile
-                 const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', session.user.id)
-                    .maybeSingle();
+    let mounted = true;
 
-                 if (profile) {
-                     setCurrentUser(profile as User);
-                 } else {
-                     // Fallback if profile trigger failed or hasn't run yet
-                     // This creates a temporary user object so the app can function
-                     setCurrentUser({
-                         id: session.user.id,
-                         email: session.user.email || '',
-                         name: session.user.user_metadata.full_name || 'User',
-                         role: 'Developer',
-                         avatar: '',
-                         workspaceIds: []
-                     });
-                 }
-             } else {
-                 setCurrentUser(null);
-                 setWorkspaces([]);
-                 setAllProjects([]);
-                 setActiveWorkspaceId('');
-                 setActiveProjectId('');
-             }
-             setIsLoading(false);
-        });
-        subscription = authListener.subscription;
+    // Helper to load user data and workspaces
+    const handleSession = async (session: any) => {
+        if (!session?.user) {
+            if (mounted) {
+                setCurrentUser(null);
+                setWorkspaces([]);
+                setAllProjects([]);
+                setActiveWorkspaceId('');
+                setActiveProjectId('');
+                setIsLoading(false);
+            }
+            return;
+        }
 
-        // Check initial session
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) setIsLoading(false);
-      } else {
-        setIsLoading(false);
-      }
+        try {
+            // 1. Fetch Profile
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .maybeSingle();
+
+            let userObj: User;
+
+            if (profile) {
+                userObj = profile as User;
+            } else {
+                // Fallback
+                userObj = {
+                    id: session.user.id,
+                    email: session.user.email || '',
+                    name: session.user.user_metadata.full_name || 'User',
+                    role: 'Developer',
+                    avatar: '',
+                    workspaceIds: []
+                };
+            }
+
+            // 2. Fetch Workspaces & Users (Parallel)
+            // We fetch these BEFORE setting loading=false to avoid UI flash
+            const [wsData, allUsers] = await Promise.all([
+                api.getWorkspaces(),
+                api.getUsers()
+            ]);
+
+            if (mounted) {
+                // Update User
+                setCurrentUser(userObj);
+                setUsers(allUsers);
+
+                // Update Workspaces
+                const shouldHaveWorkspaces = userObj.workspaceIds && userObj.workspaceIds.length > 0;
+                
+                // Only overwrite workspaces if we got data or we expect none
+                if (wsData.length > 0) {
+                    setWorkspaces(wsData);
+                    
+                    // Set active workspace logic
+                    // Prefer the one in profile if valid, else first one
+                    const preferredId = userObj.workspaceIds?.find(id => wsData.some(w => w.id === id));
+                    
+                    if (preferredId) {
+                        setActiveWorkspaceId(preferredId);
+                    } else if (wsData[0]) {
+                        setActiveWorkspaceId(wsData[0].id);
+                    }
+                } else if (!shouldHaveWorkspaces) {
+                    setWorkspaces([]);
+                }
+            }
+        } catch (error) {
+            console.error("Error loading session data:", error);
+        } finally {
+            if (mounted) setIsLoading(false);
+        }
     };
-    initAuth();
+
+    const init = async () => {
+        if (!isSupabaseConfigured) {
+            if (mounted) setIsLoading(false);
+            return;
+        }
+
+        try {
+            // Check initial session
+            const { data: { session } } = await supabase.auth.getSession();
+            await handleSession(session);
+
+            // Listen for changes
+            const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+                 if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                     await handleSession(session);
+                 } else if (event === 'SIGNED_OUT') {
+                     await handleSession(null);
+                 }
+            });
+            
+            return subscription;
+        } catch (e) {
+            console.error("Auth init failed", e);
+            if (mounted) setIsLoading(false);
+        }
+    };
+
+    const subPromise = init();
 
     return () => {
-        if (subscription) subscription.unsubscribe();
+        mounted = false;
+        subPromise.then(sub => sub?.unsubscribe());
     };
   }, []);
 
-  // 2. Fetch Workspaces when User logs in
-  useEffect(() => {
-    if (!currentUser) return;
-
-    const loadWorkspaces = async () => {
-      try {
-        // Fetch workspaces via API (RLS ensures we only get ours)
-        const [wsData, allUsers] = await Promise.all([
-            api.getWorkspaces(),
-            api.getUsers()
-        ]);
-        
-        // CRITICAL FIX: If we just signed up, optimistic state might be populated.
-        // If API returns empty (due to lag), but we expect workspaces, don't overwrite with empty.
-        // Only overwrite if API returns data OR if we truly expect nothing.
-        const shouldHaveWorkspaces = currentUser.workspaceIds && currentUser.workspaceIds.length > 0;
-        
-        if (wsData.length > 0) {
-            setWorkspaces(wsData);
-            
-            // Set active workspace logic
-            // Prefer the one in profile if valid, else first one
-            const preferredId = currentUser.workspaceIds?.find(id => wsData.some(w => w.id === id));
-            if (preferredId && !activeWorkspaceId) {
-                setActiveWorkspaceId(preferredId);
-            } else if (!activeWorkspaceId && wsData[0]) {
-                setActiveWorkspaceId(wsData[0].id);
-            }
-        } else if (!shouldHaveWorkspaces) {
-            // Only clear if user shouldn't have any
-            setWorkspaces([]);
-        }
-        
-        setUsers(allUsers);
-      } catch (e) {
-        console.error("Error loading workspaces:", e);
-      }
-    };
-    loadWorkspaces();
-  }, [currentUser, activeWorkspaceId]); // Keeping activeWorkspaceId here to ensure consistency if it changes
-
-  // 3. Fetch Projects & Teams when Active Workspace changes
+  // 2. Fetch Projects & Teams when Active Workspace changes
   useEffect(() => {
     if (!activeWorkspaceId) return;
 
@@ -218,7 +238,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     loadWorkspaceData();
   }, [activeWorkspaceId]);
 
-  // 4. Fetch Issues/Sprints/Epics when Active Project changes
+  // 3. Fetch Issues/Sprints/Epics when Active Project changes
   useEffect(() => {
      if (!activeProjectId) return;
      const fetchProjectData = async () => {
