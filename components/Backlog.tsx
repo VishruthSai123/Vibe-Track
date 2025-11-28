@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useProject } from '../store/ProjectContext';
 import { Issue, IssueType, Priority, Sprint, Permission } from '../types';
@@ -108,23 +107,23 @@ export const Backlog: React.FC = () => {
   if (!activeProject) return <div>Select a project</div>;
 
   return (
-    <div className="h-full overflow-y-auto bg-white p-8">
+    <div className="h-full overflow-y-auto bg-white p-4 md:p-8">
       <div className="flex justify-between items-center mb-6">
         <div>
-            <h1 className="text-2xl font-bold text-slate-800">Backlog</h1>
-            <p className="text-sm text-slate-500">{activeProject.name} Planning</p>
+            <h1 className="text-xl md:text-2xl font-bold text-slate-800">Backlog</h1>
+            <p className="text-xs md:text-sm text-slate-500">{activeProject.name} Planning</p>
         </div>
         {canCreateSprint && (
             <button 
                 onClick={() => setShowCreateSprintModal(true)}
-                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-md font-medium text-sm transition-colors shadow-sm"
+                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-md font-medium text-sm transition-colors shadow-sm whitespace-nowrap"
             >
                 Create Sprint
             </button>
         )}
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-8 pb-10">
         {/* Sprints Section */}
         {sortedSprints.filter(s => s.status !== 'COMPLETED').map(sprint => {
              const sprintIssues = getIssuesForSprint(sprint.id);
@@ -141,13 +140,13 @@ export const Backlog: React.FC = () => {
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, sprint.id)}
                 >
-                    <div className="p-4 flex items-center justify-between bg-slate-100 border-b border-slate-200">
+                    <div className="p-3 md:p-4 flex flex-col md:flex-row md:items-center justify-between bg-slate-100 border-b border-slate-200 gap-3">
                         <div className="flex items-center space-x-3">
-                             <button onClick={() => toggleSprint(sprint.id)} className="text-slate-500 hover:text-slate-800 transition-colors">
+                             <button onClick={() => toggleSprint(sprint.id)} className="text-slate-500 hover:text-slate-800 transition-colors p-1">
                                 {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                              </button>
-                             <div>
-                                 <div className="flex items-center space-x-2">
+                             <div className="flex-1">
+                                 <div className="flex items-center space-x-2 flex-wrap gap-y-1">
                                      <h3 className="font-semibold text-slate-800">{sprint.name}</h3>
                                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                                          sprint.status === 'ACTIVE' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'
@@ -156,9 +155,9 @@ export const Backlog: React.FC = () => {
                                      </span>
                                  </div>
                                  <div className="flex items-center space-x-2 mt-1">
-                                    <p className="text-xs text-slate-500 font-medium">{sprintIssues.length} issues • {totalPoints} pts</p>
+                                    <p className="text-xs text-slate-500 font-medium whitespace-nowrap">{sprintIssues.length} issues • {totalPoints} pts</p>
                                     {/* Capacity Bar */}
-                                    <div className="w-24 h-1.5 bg-slate-200 rounded-full overflow-hidden" title={`Capacity: ${totalPoints}/${capacity}`}>
+                                    <div className="w-16 md:w-24 h-1.5 bg-slate-200 rounded-full overflow-hidden" title={`Capacity: ${totalPoints}/${capacity}`}>
                                         <div 
                                             className={`h-full rounded-full ${isOverCapacity ? 'bg-red-500' : 'bg-green-500'}`} 
                                             style={{ width: `${capacityPercentage}%` }}
@@ -168,14 +167,14 @@ export const Backlog: React.FC = () => {
                                         {totalPoints}/{capacity}
                                     </span>
                                  </div>
-                                 {sprint.goal && <p className="text-xs text-slate-400 mt-0.5 italic">Goal: {sprint.goal}</p>}
+                                 {sprint.goal && <p className="text-xs text-slate-400 mt-0.5 italic truncate max-w-[200px] md:max-w-xs">Goal: {sprint.goal}</p>}
                              </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center justify-end space-x-2 pl-8 md:pl-0">
                             {sprint.status === 'PLANNED' && canManageSprint && (
                                 <button 
                                     onClick={() => openStartSprintModal(sprint)}
-                                    className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition-colors shadow-sm"
+                                    className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition-colors shadow-sm whitespace-nowrap"
                                 >
                                     Start Sprint
                                 </button>
@@ -436,10 +435,10 @@ const BacklogItem: React.FC<{
             onDragStart={(e) => onDragStart(e, issue.id)}
         >
             <div className="flex items-center space-x-3 flex-1 min-w-0" onClick={() => onClick(issue)}>
-                <div className="cursor-grab text-slate-300 hover:text-slate-500">
+                <div className="cursor-grab text-slate-300 hover:text-slate-500 hidden md:block">
                     <GripVertical className="w-4 h-4" />
                 </div>
-                <div className={`p-1.5 rounded ${
+                <div className={`p-1.5 rounded flex-shrink-0 ${
                     issue.type === IssueType.BUG ? 'bg-red-100 text-red-600' :
                     issue.type === IssueType.STORY ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'
                 }`}>
@@ -448,15 +447,15 @@ const BacklogItem: React.FC<{
                 </div>
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center space-x-2">
-                        <span className="text-slate-500 text-xs font-mono">{issue.id}</span>
+                        <span className="text-slate-500 text-xs font-mono hidden md:inline">{issue.id}</span>
                         <p className="text-sm text-slate-800 truncate font-medium group-hover:text-indigo-600 transition-colors">{issue.title}</p>
                     </div>
                 </div>
             </div>
 
-            <div className="flex items-center space-x-4 pl-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center space-x-3 pl-4" onClick={(e) => e.stopPropagation()}>
                 {issue.epicId && (
-                     <span className="text-[10px] uppercase font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-100">
+                     <span className="text-[10px] uppercase font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded border border-purple-100 hidden md:inline-block">
                         Epic
                      </span>
                 )}

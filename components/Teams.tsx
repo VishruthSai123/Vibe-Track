@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useProject } from '../store/ProjectContext';
 import { Users, Shield, Plus, X } from 'lucide-react';
@@ -31,13 +30,13 @@ export const Teams: React.FC = () => {
   };
 
   return (
-    <div className="h-full bg-slate-50 p-8 overflow-y-auto">
+    <div className="h-full bg-slate-50 p-4 md:p-8 overflow-y-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+        <h1 className="text-xl md:text-2xl font-bold text-slate-800 flex items-center gap-2">
           <Users className="w-6 h-6 text-slate-400" />
           Teams
         </h1>
-        <p className="text-slate-500 mt-1">Manage functional teams and member capacity.</p>
+        <p className="text-sm text-slate-500 mt-1">Manage functional teams and member capacity.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -91,7 +90,7 @@ export const Teams: React.FC = () => {
         {canManageTeams && (
             <button 
                 onClick={() => setShowCreateModal(true)}
-                className="border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all min-h-[250px] gap-2 p-6"
+                className="border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all min-h-[200px] gap-2 p-6"
             >
                 <div className="p-3 bg-slate-100 rounded-full group-hover:bg-white transition-colors">
                     <Plus className="w-6 h-6" />

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useProject } from '../store/ProjectContext';
 import { 
@@ -89,19 +88,19 @@ export const Dashboard: React.FC = () => {
   if (!activeProject) return <div>Select a project</div>;
 
   return (
-    <div className="p-8 overflow-y-auto h-full bg-slate-50">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-4 md:p-8 overflow-y-auto h-full bg-slate-50 pb-12">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
-          <p className="text-slate-500 mt-1">Overview of {activeProject.name} velocity and progress</p>
+          <h1 className="text-xl md:text-2xl font-bold text-slate-800">Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-1">Overview of {activeProject.name} velocity and progress</p>
         </div>
-        <div className="text-sm text-slate-500 bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
+        <div className="text-sm text-slate-500 bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm w-full md:w-auto text-center">
              Last updated: {new Date().toLocaleTimeString()}
         </div>
       </div>
       
       {/* Top Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {/* Active Sprint Card */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 md:col-span-2 relative overflow-hidden">
              {activeSprint ? (
@@ -170,22 +169,22 @@ export const Dashboard: React.FC = () => {
                  </span>
                  <span className="text-sm text-slate-500">total</span>
              </div>
-              <div className="mt-4 flex space-x-2">
-                  <span className="bg-red-50 text-red-600 px-2 py-0.5 rounded text-xs font-medium">
+              <div className="mt-4 flex space-x-2 flex-wrap gap-2">
+                  <span className="bg-red-50 text-red-600 px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap">
                       {issues.filter(i => i.priority === Priority.CRITICAL && i.status !== Status.DONE).length} Critical
                   </span>
-                  <span className="bg-orange-50 text-orange-600 px-2 py-0.5 rounded text-xs font-medium">
+                  <span className="bg-orange-50 text-orange-600 px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap">
                       {issues.filter(i => i.priority === Priority.HIGH && i.status !== Status.DONE).length} High
                   </span>
               </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 mb-8">
         {/* Burndown Chart */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
             <h3 className="text-lg font-bold text-slate-800 mb-6">Sprint Burndown</h3>
-            <div className="h-72">
+            <div className="h-64 md:h-72">
                  {activeSprint ? (
                      <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={burndownData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
@@ -217,7 +216,7 @@ export const Dashboard: React.FC = () => {
         {/* Status Breakdown Pie */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
           <h3 className="text-lg font-bold text-slate-800 mb-6">Overall Status</h3>
-          <div className="h-72">
+          <div className="h-64 md:h-72">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -241,7 +240,7 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
           {/* Velocity Bar Chart */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                <h3 className="text-lg font-bold text-slate-800 mb-6">Sprint Velocity</h3>

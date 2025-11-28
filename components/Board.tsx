@@ -16,13 +16,13 @@ export const Board: React.FC = () => {
   // If no active sprint, show empty state
   if (!activeSprint) {
       return (
-          <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-slate-50">
-              <div className="bg-white p-12 rounded-2xl shadow-xl border border-slate-100 max-w-md animate-fade-in-up">
+          <div className="h-full flex flex-col items-center justify-center p-4 md:p-8 text-center bg-slate-50">
+              <div className="bg-white p-8 md:p-12 rounded-2xl shadow-xl border border-slate-100 max-w-md animate-fade-in-up w-full">
                   <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
                       <Clock className="w-10 h-10 text-indigo-500" />
                   </div>
-                  <h2 className="text-2xl font-bold text-slate-800 mb-3">No Active Sprint</h2>
-                  <p className="text-slate-500 mb-8 leading-relaxed">
+                  <h2 className="text-xl md:text-2xl font-bold text-slate-800 mb-3">No Active Sprint</h2>
+                  <p className="text-slate-500 mb-8 leading-relaxed text-sm md:text-base">
                       Your team isn't currently running a sprint. Head over to the Backlog to plan and kick off your next sprint.
                   </p>
                   <div className="inline-flex items-center text-indigo-600 font-semibold text-sm border border-indigo-200 bg-indigo-50 px-4 py-2 rounded-lg">
@@ -77,30 +77,30 @@ export const Board: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-slate-50/50">
       {/* Board Header */}
-      <div className="px-8 py-5 bg-white border-b border-slate-200 flex-shrink-0 shadow-sm z-10">
-          <div className="flex justify-between items-start mb-4">
+      <div className="px-4 py-4 md:px-8 md:py-5 bg-white border-b border-slate-200 flex-shrink-0 shadow-sm z-10">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
             <div>
                 <div className="flex items-center space-x-3">
-                    <h1 className="text-2xl font-bold text-slate-800">{activeSprint.name}</h1>
-                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold uppercase tracking-wide border border-indigo-100">
+                    <h1 className="text-xl md:text-2xl font-bold text-slate-800 truncate">{activeSprint.name}</h1>
+                    <span className="px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-bold uppercase tracking-wide border border-indigo-100 flex-shrink-0">
                         Active
                     </span>
                 </div>
-                <p className="text-sm text-slate-500 mt-1 max-w-xl truncate">{activeSprint.goal}</p>
+                <p className="text-sm text-slate-500 mt-1 max-w-xl truncate hidden md:block">{activeSprint.goal}</p>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 md:space-x-4 w-full md:w-auto justify-between md:justify-end">
                 <div className="text-xs text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg font-medium flex items-center space-x-2">
                     <Clock className="w-3.5 h-3.5 text-slate-400" />
                     <span>
                         {activeSprint.endDate ? 
-                            `${Math.max(0, Math.ceil((new Date(activeSprint.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))} days left` :
+                            `${Math.max(0, Math.ceil((new Date(activeSprint.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))}d left` :
                             'No deadline'
                         }
                     </span>
                 </div>
                 <button 
                     onClick={() => setShowCompleteModal(true)}
-                    className="bg-slate-900 text-white hover:bg-black px-4 py-2 rounded-lg font-medium text-sm transition-all shadow-sm hover:shadow-md"
+                    className="bg-slate-900 text-white hover:bg-black px-4 py-2 rounded-lg font-medium text-sm transition-all shadow-sm hover:shadow-md whitespace-nowrap"
                     >
                     Complete Sprint
                 </button>
@@ -108,14 +108,14 @@ export const Board: React.FC = () => {
           </div>
           
           {/* Filters Row */}
-          <div className="flex items-center space-x-2">
-              <span className="text-xs font-semibold text-slate-400 uppercase mr-2 tracking-wider">Assignee:</span>
+          <div className="flex items-center space-x-2 overflow-x-auto pb-1 md:pb-0 scrollbar-hide">
+              <span className="text-xs font-semibold text-slate-400 uppercase mr-2 tracking-wider flex-shrink-0">Assignee:</span>
               <div className="flex -space-x-2 mr-2">
                   {users.map(u => (
                       <button 
                         key={u.id}
                         onClick={() => setSelectedUserId(selectedUserId === u.id ? null : u.id)}
-                        className={`relative w-8 h-8 rounded-full border-2 transition-all hover:z-10 hover:scale-110 ${selectedUserId === u.id ? 'border-indigo-500 ring-2 ring-indigo-200 z-10' : 'border-white opacity-80 hover:opacity-100'}`}
+                        className={`relative w-8 h-8 rounded-full border-2 transition-all hover:z-10 hover:scale-110 flex-shrink-0 ${selectedUserId === u.id ? 'border-indigo-500 ring-2 ring-indigo-200 z-10' : 'border-white opacity-80 hover:opacity-100'}`}
                         title={u.name}
                       >
                           <img src={u.avatar} className="w-full h-full rounded-full" alt={u.name} />
@@ -125,7 +125,7 @@ export const Board: React.FC = () => {
               {selectedUserId && (
                   <button 
                     onClick={() => setSelectedUserId(null)}
-                    className="text-xs text-slate-500 hover:text-indigo-600 font-medium px-2 flex items-center space-x-1 bg-slate-100 rounded-full py-0.5 transition-colors"
+                    className="text-xs text-slate-500 hover:text-indigo-600 font-medium px-2 flex items-center space-x-1 bg-slate-100 rounded-full py-0.5 transition-colors flex-shrink-0"
                   >
                       <X className="w-3 h-3" />
                       <span>Clear</span>
@@ -135,14 +135,14 @@ export const Board: React.FC = () => {
       </div>
 
       {/* Columns */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden whitespace-nowrap p-6 bg-slate-50">
-        <div className="flex space-x-6 h-full">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden whitespace-nowrap p-4 md:p-6 bg-slate-50">
+        <div className="flex space-x-4 md:space-x-6 h-full">
             {COLUMNS.map(column => {
                 const columnIssues = getIssuesByStatus(column.id);
                 return (
                     <div 
                         key={column.id} 
-                        className="w-80 flex-shrink-0 flex flex-col bg-slate-100/50 rounded-xl max-h-full border border-slate-200/60 shadow-sm transition-colors"
+                        className="w-72 md:w-80 flex-shrink-0 flex flex-col bg-slate-100/50 rounded-xl max-h-full border border-slate-200/60 shadow-sm transition-colors"
                         onDragOver={handleDragOver}
                         onDrop={(e) => handleDrop(e, column.id)}
                     >
