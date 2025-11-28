@@ -123,13 +123,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) setLoading(false);
       } else {
-        // Fallback Local Storage Auth
-        const savedUser = localStorage.getItem('vibetrack-user');
-        if (savedUser) {
-           const user = JSON.parse(savedUser);
-           setCurrentUser(user);
-           if (user.workspaceIds?.length > 0) setActiveWorkspaceId(user.workspaceIds[0]);
-        }
+        // Stop loading if no backend, but don't log in a fake user.
         setLoading(false);
       }
     };
@@ -221,16 +215,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         showToast("Welcome back!", "success");
       }
     } else {
-      // Simulation Login
-      const user = users.find(u => u.email === email);
-      if (user) {
-        setCurrentUser(user);
-        localStorage.setItem('vibetrack-user', JSON.stringify(user));
-        if (user.workspaceIds.length > 0) setActiveWorkspaceId(user.workspaceIds[0]);
-        showToast("Welcome back!", "success");
-      } else {
-        showToast("User not found. Try 'alex@vibetrack.com'", "error");
-      }
+      showToast("Supabase not configured. Please connect a backend.", "error");
     }
   };
 
@@ -243,7 +228,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
        }
        if (authData.user) {
          // Note: Triggers in SQL usually handle profile creation. 
-         // Here we assume manual creation for robustness if triggers fail or aren't set up yet in this demo env
          const userId = authData.user.id;
          const workspaceId = `ws-${Date.now()}`;
          
@@ -275,7 +259,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
          try {
              // In a real app with triggers, we might skip profile insertion if trigger exists
-             // but for safety in this demo context:
              const { error: profileError } = await supabase.from('profiles').upsert(newUser);
              if(!profileError) {
                 await supabase.from('workspaces').insert(newWorkspace);
@@ -290,31 +273,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
          }
        }
     } else {
-      // Simulation Signup
-      const newWorkspaceId = `ws-${Date.now()}`;
-      const newUserId = `u-${Date.now()}`;
-      const newProjectId = `p-${Date.now()}`;
-
-      const newUser: User = {
-        id: newUserId, name, email, avatar: `https://ui-avatars.com/api/?name=${name}&background=random`, role, workspaceIds: [newWorkspaceId]
-      };
-
-      const newWorkspace: Workspace = {
-        id: newWorkspaceId, name: workspaceName, ownerId: newUserId, members: [newUserId]
-      };
-
-      const newProject: Project = {
-        id: newProjectId, workspaceId: newWorkspaceId, name: 'My First Project', key: 'PROJ', description: 'Your first project.', leadId: newUserId, type: 'software'
-      };
-
-      setUsers([...users, newUser]);
-      setWorkspaces([...workspaces, newWorkspace]);
-      setAllProjects([...allProjects, newProject]);
-      setCurrentUser(newUser);
-      setActiveWorkspaceId(newWorkspaceId);
-      setActiveProjectId(newProjectId);
-      localStorage.setItem('vibetrack-user', JSON.stringify(newUser));
-      showToast("Account created successfully!", "success");
+      showToast("Supabase not configured. Please connect a backend.", "error");
     }
   };
 

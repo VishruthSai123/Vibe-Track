@@ -6,7 +6,7 @@ export const Auth: React.FC = () => {
   const { login, signup } = useProject();
   const [mode, setMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState(''); // Mock password
+  const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [workspaceName, setWorkspaceName] = useState('');
   const [role, setRole] = useState('Developer');
@@ -21,127 +21,154 @@ export const Auth: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-      <div className="mb-8 flex flex-col items-center animate-fade-in-up">
-        <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-indigo-200 shadow-xl mb-4 rotate-3">
-          <Zap className="w-10 h-10 text-white" fill="currentColor" />
-        </div>
-        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">VibeTrack</h1>
-        <p className="text-slate-500 mt-2">Manage projects at the speed of thought.</p>
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100 via-slate-50 to-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      
+      {/* Decorative background elements */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+          <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-indigo-200/20 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-[-10%] left-[-5%] w-96 h-96 bg-purple-200/20 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-100 animate-fade-in-up delay-100">
-        <div className="flex border-b border-slate-100 mb-6">
-          <button 
-            className={`flex-1 pb-3 text-sm font-semibold transition-colors ${mode === 'LOGIN' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}
-            onClick={() => setMode('LOGIN')}
-          >
-            Log In
-          </button>
-          <button 
-            className={`flex-1 pb-3 text-sm font-semibold transition-colors ${mode === 'SIGNUP' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-slate-400'}`}
-            onClick={() => setMode('SIGNUP')}
-          >
-            Sign Up
-          </button>
+      <div className="w-full max-w-md z-10">
+        <div className="mb-10 text-center animate-fade-in-up">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-2xl shadow-lg shadow-indigo-500/30 mb-6 transform hover:rotate-6 transition-transform duration-300">
+            <Zap className="w-8 h-8 text-white" fill="currentColor" />
+          </div>
+          <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">VibeTrack</h1>
+          <p className="text-lg text-slate-500">Manage projects at the speed of thought.</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {mode === 'SIGNUP' && (
-            <>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Full Name</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input 
-                    type="text" 
-                    required 
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500 outline-none" 
-                    placeholder="John Doe"
-                  />
+        <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/50 w-full animate-fade-in-up delay-100">
+          
+          {/* Toggle Switch */}
+          <div className="bg-slate-100/80 p-1.5 rounded-xl flex mb-8 relative">
+            <button 
+              type="button"
+              className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 z-10 ${mode === 'LOGIN' ? 'text-indigo-900 shadow-sm bg-white' : 'text-slate-500 hover:text-slate-700'}`}
+              onClick={() => setMode('LOGIN')}
+            >
+              Log In
+            </button>
+            <button 
+              type="button"
+              className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 z-10 ${mode === 'SIGNUP' ? 'text-indigo-900 shadow-sm bg-white' : 'text-slate-500 hover:text-slate-700'}`}
+              onClick={() => setMode('SIGNUP')}
+            >
+              Sign Up
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {mode === 'SIGNUP' && (
+              <div className="space-y-5 animate-fade-in-up">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Full Name</label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <User className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                    </div>
+                    <input 
+                      type="text" 
+                      required 
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
+                      placeholder="John Doe"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Workspace</label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Building className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                    </div>
+                    <input 
+                      type="text" 
+                      required 
+                      value={workspaceName}
+                      onChange={(e) => setWorkspaceName(e.target.value)}
+                      className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
+                      placeholder="Acme Corp"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Role</label>
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Briefcase className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                    </div>
+                    <select 
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm appearance-none"
+                    >
+                      <option value="Founder">Founder</option>
+                      <option value="Product Manager">Product Manager</option>
+                      <option value="Developer">Developer</option>
+                      <option value="Designer">Designer</option>
+                      <option value="QA Engineer">QA Engineer</option>
+                      <option value="Operations">Operations</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Workspace Name</label>
-                <div className="relative">
-                  <Building className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input 
-                    type="text" 
-                    required 
-                    value={workspaceName}
-                    onChange={(e) => setWorkspaceName(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500 outline-none" 
-                    placeholder="Acme Corp"
-                  />
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Email Address</label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                 </div>
+                <input 
+                  type="email" 
+                  required 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
+                  placeholder="name@company.com"
+                />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Role</label>
-                <div className="relative">
-                  <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <select 
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500 outline-none bg-white appearance-none text-slate-700"
-                  >
-                    <option value="Founder">Founder</option>
-                    <option value="Product Manager">Product Manager</option>
-                    <option value="Developer">Developer</option>
-                    <option value="Designer">Designer</option>
-                    <option value="QA Engineer">QA Engineer</option>
-                    <option value="Operations">Operations</option>
-                  </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Password</label>
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                 </div>
+                <input 
+                  type="password" 
+                  required 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
+                  placeholder="••••••••"
+                />
               </div>
-            </>
+            </div>
+
+            <button 
+              type="submit" 
+              className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-200 transform transition-all active:scale-[0.98] flex items-center justify-center space-x-2 mt-2"
+            >
+              <span>{mode === 'LOGIN' ? 'Sign In' : 'Create Account'}</span>
+              <ArrowRight className="w-5 h-5" />
+            </button>
+          </form>
+
+          {mode === 'LOGIN' && (
+            <p className="mt-6 text-center text-sm text-slate-400">
+              Forgot your password? <a href="#" className="text-indigo-600 hover:text-indigo-700 font-semibold hover:underline">Reset here</a>
+            </p>
           )}
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Email Address</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input 
-                type="email" 
-                required 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500 outline-none" 
-                placeholder="you@company.com"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Password</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input 
-                type="password" 
-                required 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg py-2.5 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500 outline-none" 
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
-
-          <button 
-            type="submit" 
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg shadow-lg shadow-indigo-200 transition-all flex items-center justify-center space-x-2 mt-4"
-          >
-            <span>{mode === 'LOGIN' ? 'Sign In' : 'Create Workspace'}</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </form>
-
-        {mode === 'LOGIN' && (
-           <div className="mt-6 p-3 bg-blue-50 text-blue-700 text-xs rounded-lg">
-             <span className="font-bold">Demo Tip:</span> Use <code>alex@vibetrack.com</code> to login with pre-populated data.
-           </div>
-        )}
+        </div>
+        
+        <p className="mt-8 text-center text-sm text-slate-400 font-medium">
+          &copy; {new Date().getFullYear()} VibeTrack. All rights reserved.
+        </p>
       </div>
     </div>
   );

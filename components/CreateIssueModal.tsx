@@ -9,7 +9,7 @@ interface CreateIssueModalProps {
 }
 
 export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({ onClose }) => {
-  const { addIssue, users, sprints, epics } = useProject();
+  const { addIssue, users, sprints, epics, currentUser } = useProject();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [type, setType] = useState<IssueType>(IssueType.STORY);
@@ -22,6 +22,8 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({ onClose }) =
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentUser) return;
+    
     addIssue({
       title,
       description,
@@ -29,7 +31,7 @@ export const CreateIssueModal: React.FC<CreateIssueModalProps> = ({ onClose }) =
       priority,
       status: Status.TODO,
       assigneeId: assigneeId || undefined,
-      reporterId: 'u1', // Default current user
+      reporterId: currentUser.id,
       sprintId: sprintId || null,
       epicId: epicId || undefined,
       storyPoints: storyPoints || undefined

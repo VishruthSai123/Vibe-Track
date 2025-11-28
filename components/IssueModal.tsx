@@ -10,7 +10,7 @@ interface IssueModalProps {
 }
 
 export const IssueModal: React.FC<IssueModalProps> = ({ issue, onClose }) => {
-  const { updateIssue, users, addComment, deleteIssue, sprints, epics } = useProject();
+  const { updateIssue, users, addComment, deleteIssue, sprints, epics, currentUser } = useProject();
   const [description, setDescription] = useState(issue.description);
   const [title, setTitle] = useState(issue.title);
   const [newComment, setNewComment] = useState('');
@@ -83,9 +83,8 @@ export const IssueModal: React.FC<IssueModalProps> = ({ issue, onClose }) => {
   };
 
   const submitComment = () => {
-      if(!newComment.trim()) return;
-      // Mock current user as 'u1'
-      addComment(issue.id, newComment, 'u1');
+      if(!newComment.trim() || !currentUser) return;
+      addComment(issue.id, newComment, currentUser.id);
       setNewComment('');
   };
 
@@ -116,9 +115,8 @@ export const IssueModal: React.FC<IssueModalProps> = ({ issue, onClose }) => {
       const file = e.target.files?.[0];
       if (!file) return;
       
-      // Limit file size to 0.5 MB to avoid LocalStorage quota issues
       if (file.size > 500 * 1024) {
-          alert("File is too large. Max 500KB allowed for demo.");
+          alert("File is too large. Max 500KB allowed.");
           return;
       }
 
