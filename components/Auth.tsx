@@ -21,154 +21,157 @@ export const Auth: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100 via-slate-50 to-white flex flex-col items-center justify-center p-6 relative overflow-hidden">
+    <div className="h-full w-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-100 via-slate-50 to-white overflow-y-auto">
       
-      {/* Decorative background elements */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+      {/* Decorative background elements - Fixed so they don't scroll away */}
+      <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
           <div className="absolute top-[-10%] right-[-5%] w-96 h-96 bg-indigo-200/20 rounded-full blur-3xl"></div>
           <div className="absolute bottom-[-10%] left-[-5%] w-96 h-96 bg-purple-200/20 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="w-full max-w-md z-10">
-        <div className="mb-10 text-center animate-fade-in-up">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-2xl shadow-lg shadow-indigo-500/30 mb-6 transform hover:rotate-6 transition-transform duration-300">
-            <Zap className="w-8 h-8 text-white" fill="currentColor" />
-          </div>
-          <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">VibeTrack</h1>
-          <p className="text-lg text-slate-500">Manage projects at the speed of thought.</p>
-        </div>
-
-        <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/50 w-full animate-fade-in-up delay-100">
-          
-          {/* Toggle Switch */}
-          <div className="bg-slate-100/80 p-1.5 rounded-xl flex mb-8 relative">
-            <button 
-              type="button"
-              className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 z-10 ${mode === 'LOGIN' ? 'text-indigo-900 shadow-sm bg-white' : 'text-slate-500 hover:text-slate-700'}`}
-              onClick={() => setMode('LOGIN')}
-            >
-              Log In
-            </button>
-            <button 
-              type="button"
-              className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 z-10 ${mode === 'SIGNUP' ? 'text-indigo-900 shadow-sm bg-white' : 'text-slate-500 hover:text-slate-700'}`}
-              onClick={() => setMode('SIGNUP')}
-            >
-              Sign Up
-            </button>
+      {/* Scrollable Content Container */}
+      <div className="min-h-full flex flex-col items-center justify-center p-6 relative z-10">
+        <div className="w-full max-w-md my-auto">
+          <div className="mb-10 text-center animate-fade-in-up">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-2xl shadow-lg shadow-indigo-500/30 mb-6 transform hover:rotate-6 transition-transform duration-300">
+              <Zap className="w-8 h-8 text-white" fill="currentColor" />
+            </div>
+            <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-2">VibeTrack</h1>
+            <p className="text-lg text-slate-500">Manage projects at the speed of thought.</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {mode === 'SIGNUP' && (
-              <div className="space-y-5 animate-fade-in-up">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Full Name</label>
-                  <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <User className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+          <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/50 w-full animate-fade-in-up delay-100">
+            
+            {/* Toggle Switch */}
+            <div className="bg-slate-100/80 p-1.5 rounded-xl flex mb-8 relative">
+              <button 
+                type="button"
+                className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 z-10 ${mode === 'LOGIN' ? 'text-indigo-900 shadow-sm bg-white' : 'text-slate-500 hover:text-slate-700'}`}
+                onClick={() => setMode('LOGIN')}
+              >
+                Log In
+              </button>
+              <button 
+                type="button"
+                className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 z-10 ${mode === 'SIGNUP' ? 'text-indigo-900 shadow-sm bg-white' : 'text-slate-500 hover:text-slate-700'}`}
+                onClick={() => setMode('SIGNUP')}
+              >
+                Sign Up
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {mode === 'SIGNUP' && (
+                <div className="space-y-5 animate-fade-in-up">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Full Name</label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <User className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                      </div>
+                      <input 
+                        type="text" 
+                        required 
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
+                        placeholder="John Doe"
+                      />
                     </div>
-                    <input 
-                      type="text" 
-                      required 
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
-                      placeholder="John Doe"
-                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Workspace</label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Building className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                      </div>
+                      <input 
+                        type="text" 
+                        required 
+                        value={workspaceName}
+                        onChange={(e) => setWorkspaceName(e.target.value)}
+                        className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
+                        placeholder="Acme Corp"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Role</label>
+                    <div className="relative group">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Briefcase className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                      </div>
+                      <select 
+                        value={role}
+                        onChange={(e) => setRole(e.target.value)}
+                        className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm appearance-none"
+                      >
+                        <option value="Founder">Founder</option>
+                        <option value="Product Manager">Product Manager</option>
+                        <option value="Developer">Developer</option>
+                        <option value="Designer">Designer</option>
+                        <option value="QA Engineer">QA Engineer</option>
+                        <option value="Operations">Operations</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Workspace</label>
-                  <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Building className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                    </div>
-                    <input 
-                      type="text" 
-                      required 
-                      value={workspaceName}
-                      onChange={(e) => setWorkspaceName(e.target.value)}
-                      className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
-                      placeholder="Acme Corp"
-                    />
+              )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Email Address</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                   </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Role</label>
-                  <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Briefcase className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                    </div>
-                    <select 
-                      value={role}
-                      onChange={(e) => setRole(e.target.value)}
-                      className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm appearance-none"
-                    >
-                      <option value="Founder">Founder</option>
-                      <option value="Product Manager">Product Manager</option>
-                      <option value="Developer">Developer</option>
-                      <option value="Designer">Designer</option>
-                      <option value="QA Engineer">QA Engineer</option>
-                      <option value="Operations">Operations</option>
-                    </select>
-                  </div>
+                  <input 
+                    type="email" 
+                    required 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
+                    placeholder="name@company.com"
+                  />
                 </div>
               </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Password</label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                  </div>
+                  <input 
+                    type="password" 
+                    required 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
+                    placeholder="••••••••"
+                  />
+                </div>
+              </div>
+
+              <button 
+                type="submit" 
+                className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-200 transform transition-all active:scale-[0.98] flex items-center justify-center space-x-2 mt-2"
+              >
+                <span>{mode === 'LOGIN' ? 'Sign In' : 'Create Account'}</span>
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </form>
+
+            {mode === 'LOGIN' && (
+              <p className="mt-6 text-center text-sm text-slate-400">
+                Forgot your password? <a href="#" className="text-indigo-600 hover:text-indigo-700 font-semibold hover:underline">Reset here</a>
+              </p>
             )}
-
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Email Address</label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                </div>
-                <input 
-                  type="email" 
-                  required 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
-                  placeholder="name@company.com"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Password</label>
-              <div className="relative group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                </div>
-                <input 
-                  type="password" 
-                  required 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
-                  placeholder="••••••••"
-                />
-              </div>
-            </div>
-
-            <button 
-              type="submit" 
-              className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-200 transform transition-all active:scale-[0.98] flex items-center justify-center space-x-2 mt-2"
-            >
-              <span>{mode === 'LOGIN' ? 'Sign In' : 'Create Account'}</span>
-              <ArrowRight className="w-5 h-5" />
-            </button>
-          </form>
-
-          {mode === 'LOGIN' && (
-            <p className="mt-6 text-center text-sm text-slate-400">
-              Forgot your password? <a href="#" className="text-indigo-600 hover:text-indigo-700 font-semibold hover:underline">Reset here</a>
-            </p>
-          )}
+          </div>
+          
+          <p className="mt-8 text-center text-sm text-slate-400 font-medium pb-8">
+            &copy; {new Date().getFullYear()} VibeTrack. All rights reserved.
+          </p>
         </div>
-        
-        <p className="mt-8 text-center text-sm text-slate-400 font-medium">
-          &copy; {new Date().getFullYear()} VibeTrack. All rights reserved.
-        </p>
       </div>
     </div>
   );

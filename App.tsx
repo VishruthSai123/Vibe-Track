@@ -10,28 +10,28 @@ import { CreateIssueModal } from './components/CreateIssueModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { Auth } from './components/Auth';
 import { Teams } from './components/Teams';
-import { LayoutDashboard, Kanban, Plus, Settings as SettingsIcon, Search, Bell, HelpCircle, ListTodo, Map, Users, LogOut, ChevronDown, FolderPlus, Layers, X, CheckCircle, AlertCircle, Info, Menu } from 'lucide-react';
+import { LayoutDashboard, Kanban, Plus, Settings as SettingsIcon, Search, Bell, HelpCircle, ListTodo, Map, Users, LogOut, ChevronDown, FolderPlus, Layers, X, CheckCircle, AlertCircle, Info, Menu, Loader2 } from 'lucide-react';
 import { Permission } from './types';
 
 const ToastContainer: React.FC = () => {
     const { toasts, removeToast } = useProject();
     
     return (
-        <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none max-w-[calc(100vw-2rem)]">
+        <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-3 pointer-events-none max-w-[calc(100vw-3rem)]">
             {toasts.map(toast => (
                 <div 
                     key={toast.id}
-                    className="pointer-events-auto bg-white rounded-lg shadow-lg border border-slate-100 p-4 flex items-center gap-3 min-w-[300px] animate-slide-in-right"
+                    className="pointer-events-auto bg-white rounded-lg shadow-xl border border-slate-100 p-4 flex items-center gap-3 min-w-[320px] animate-slide-in-right transform transition-all duration-300 hover:scale-[1.02]"
                 >
-                    {toast.type === 'success' && <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />}
+                    {toast.type === 'success' && <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />}
                     {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />}
                     {toast.type === 'info' && <Info className="w-5 h-5 text-blue-500 flex-shrink-0" />}
                     
-                    <p className="flex-1 text-sm text-slate-700 font-medium break-words">{toast.message}</p>
+                    <p className="flex-1 text-sm text-slate-700 font-medium break-words leading-tight">{toast.message}</p>
                     
                     <button 
                         onClick={() => removeToast(toast.id)}
-                        className="text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+                        className="text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0 p-1 hover:bg-slate-50 rounded"
                     >
                         <X className="w-4 h-4" />
                     </button>
@@ -65,7 +65,7 @@ const AppContent: React.FC = () => {
     const { 
         currentUser, activeProject, activeWorkspace, projects, setActiveProject, 
         isAuthenticated, logout, searchQuery, setSearchQuery, notifications, 
-        markNotificationRead, clearNotifications, checkPermission
+        markNotificationRead, clearNotifications, checkPermission, isLoading
     } = useProject();
 
     const [currentView, setCurrentView] = useState<ViewType>('board');
@@ -75,16 +75,50 @@ const AppContent: React.FC = () => {
     const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+    // 1. Loading State
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
+                <Loader2 className="w-10 h-10 text-indigo-600 animate-spin mb-4" />
+                <p className="text-slate-500 font-medium animate-pulse">Initializing VibeTrack...</p>
+            </div>
+        );
+    }
+
+    // 2. Auth Check
     if (!isAuthenticated) {
         return <Auth />;
     }
 
-    // Guard: If logged in but no data (edge case)
+    // 3. Empty State (Logged in but no Workspace/Project)
     if (!activeWorkspace || !activeProject) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-                <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
-                <p className="text-slate-500 font-medium">Loading workspace...</p>
+            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
+                <ToastContainer />
+                <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-slate-100">
+                    <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <FolderPlus className="w-8 h-8 text-indigo-600" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-slate-800 mb-3">Let's get started</h2>
+                    <p className="text-slate-500 mb-8">
+                        You don't have any projects yet. Create your first project to start tracking your team's work.
+                    </p>
+                    <div className="space-y-3">
+                        <button 
+                            onClick={() => setIsCreateProjectOpen(true)}
+                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold shadow-lg shadow-indigo-200 transition-all transform active:scale-[0.98]"
+                        >
+                            Create First Project
+                        </button>
+                        <button 
+                            onClick={logout}
+                            className="w-full py-3 text-slate-500 hover:text-slate-700 font-medium transition-colors"
+                        >
+                            Sign Out
+                        </button>
+                    </div>
+                </div>
+                {isCreateProjectOpen && <CreateProjectModal onClose={() => setIsCreateProjectOpen(false)} />}
             </div>
         );
     }
@@ -132,7 +166,7 @@ const AppContent: React.FC = () => {
                 {/* Workspace Rail (Leftmost) */}
                 <div className="w-16 bg-slate-900 flex flex-col items-center py-6 space-y-4 flex-shrink-0 z-30 h-full">
                     <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-900/50 cursor-pointer hover:bg-indigo-500 transition-colors transform hover:scale-105 active:scale-95 duration-200">
-                        <span className="text-white font-bold text-lg select-none">{activeWorkspace.name[0]}</span>
+                        <span className="text-white font-bold text-lg select-none uppercase">{activeWorkspace.name[0]}</span>
                     </div>
                     <div className="w-8 h-0.5 bg-slate-700 rounded-full" />
                     
@@ -148,7 +182,7 @@ const AppContent: React.FC = () => {
                     )}
                     
                     <div className="flex-1" />
-                    <button onClick={logout} className="p-2 text-slate-500 hover:text-slate-300 transition-colors" title="Logout">
+                    <button onClick={logout} className="p-2 text-slate-500 hover:text-slate-300 transition-colors mb-2" title="Logout">
                         <LogOut className="w-5 h-5" />
                     </button>
                 </div>
@@ -163,12 +197,12 @@ const AppContent: React.FC = () => {
                                 className="w-full flex items-center justify-between p-2 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-200 hover:shadow-sm"
                             >
                                 <div className="flex items-center space-x-3 overflow-hidden">
-                                    <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm flex-shrink-0">
-                                        {activeProject.key[0]}
+                                    <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm flex-shrink-0 text-xs">
+                                        {activeProject.key.substring(0, 3)}
                                     </div>
                                     <div className="text-left min-w-0">
                                         <h3 className="text-sm font-bold text-slate-800 truncate">{activeProject.name}</h3>
-                                        <p className="text-xs text-slate-500 truncate">{activeProject.type} project</p>
+                                        <p className="text-xs text-slate-500 truncate capitalize">{activeProject.type} project</p>
                                     </div>
                                 </div>
                                 <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isProjectMenuOpen ? 'rotate-180' : ''}`} />
@@ -184,8 +218,8 @@ const AppContent: React.FC = () => {
                                             onClick={() => { setActiveProject(p.id); setIsProjectMenuOpen(false); }}
                                             className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between ${p.id === activeProject.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
                                         >
-                                            <span>{p.name}</span>
-                                            {p.id === activeProject.id && <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full" />}
+                                            <span className="truncate mr-2">{p.name}</span>
+                                            {p.id === activeProject.id && <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full flex-shrink-0" />}
                                         </button>
                                     ))}
                                     {canCreateProject && (
@@ -268,7 +302,7 @@ const AppContent: React.FC = () => {
                             onClick={() => handleViewChange('profile')}
                             className={`flex items-center space-x-3 px-2 py-2 rounded-lg cursor-pointer transition-colors ${currentView === 'profile' ? 'bg-indigo-50 border border-indigo-100' : 'hover:bg-slate-100 border border-transparent'}`}
                         >
-                            <img src={currentUser?.avatar} className="w-8 h-8 rounded-full border border-slate-200 shadow-sm" alt="Avatar" />
+                            <img src={currentUser?.avatar} className="w-8 h-8 rounded-full border border-slate-200 shadow-sm object-cover" alt="Avatar" />
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-semibold text-slate-700 truncate">{currentUser?.name}</p>
                                 <p className="text-xs text-slate-500 truncate">{currentUser?.role}</p>

@@ -29,6 +29,7 @@ interface ProjectContextType {
   searchQuery: string;
   isAuthenticated: boolean;
   toasts: Toast[];
+  isLoading: boolean;
 
   // Actions
   login: (email: string, password?: string) => Promise<void>;
@@ -65,7 +66,7 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // --- STATE ---
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Data
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -89,65 +90,104 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setToasts(prev => [...prev, { id, message, type }]);
       setTimeout(() => {
           setToasts(prev => prev.filter(t => t.id !== id));
-      }, 3000);
+      }, 4000);
   }, []);
 
   const removeToast = (id: string) => {
       setToasts(prev => prev.filter(t => t.id !== id));
   };
 
-  // Initial Load & Auth Check
+  // 1. Initial Auth Check & User Data Load
   useEffect(() => {
     let subscription: any;
     
-    const init = async () => {
-      // 1. Check Supabase Session
+    const initAuth = async () => {
       if (isSupabaseConfigured) {
+        // Listen for auth changes
         const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
              if (session?.user) {
-                 const { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+                 // Fetch full profile
+                 const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', session.user.id)
+                    .maybeSingle();
+
                  if (profile) {
                      setCurrentUser(profile as User);
-                     if (profile.workspaceIds?.length > 0 && !activeWorkspaceId) {
-                         setActiveWorkspaceId(profile.workspaceIds[0]);
-                     }
+                 } else {
+                     // Fallback if profile trigger failed or hasn't run yet
+                     setCurrentUser({
+                         id: session.user.id,
+                         email: session.user.email || '',
+                         name: session.user.user_metadata.full_name || 'User',
+                         role: 'Developer',
+                         avatar: '',
+                         workspaceIds: []
+                     });
                  }
              } else {
                  setCurrentUser(null);
+                 setWorkspaces([]);
+                 setAllProjects([]);
              }
-             setLoading(false);
+             setIsLoading(false);
         });
         subscription = authListener.subscription;
 
         // Check initial session
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) setLoading(false);
+        if (!session) setIsLoading(false);
       } else {
-        // Stop loading if no backend, but don't log in a fake user.
-        setLoading(false);
+        setIsLoading(false);
       }
     };
-    init();
+    initAuth();
 
     return () => {
         if (subscription) subscription.unsubscribe();
     };
   }, []);
 
-  // Fetch Data when Active Workspace/Project changes
+  // 2. Fetch Workspaces when User logs in
   useEffect(() => {
     if (!currentUser) return;
 
-    const fetchData = async () => {
+    const loadWorkspaces = async () => {
       try {
-        const [ws, usrs] = await Promise.all([
-          api.getWorkspaces(),
-          api.getUsers()
+        // Fetch workspaces via API (RLS ensures we only get ours)
+        const [wsData, allUsers] = await Promise.all([
+            api.getWorkspaces(),
+            api.getUsers()
         ]);
-        setWorkspaces(ws);
-        setUsers(usrs);
+        
+        setWorkspaces(wsData);
+        setUsers(allUsers);
 
-        if (activeWorkspaceId) {
+        // Set active workspace logic
+        if (wsData.length > 0) {
+            // Prefer the one in profile if valid, else first one
+            const preferredId = currentUser.workspaceIds?.find(id => wsData.some(w => w.id === id));
+            if (preferredId && !activeWorkspaceId) {
+                setActiveWorkspaceId(preferredId);
+            } else if (!activeWorkspaceId) {
+                setActiveWorkspaceId(wsData[0].id);
+            }
+        }
+      } catch (e) {
+        console.error("Error loading workspaces:", e);
+        showToast("Failed to load workspaces", "error");
+      }
+    };
+    loadWorkspaces();
+  }, [currentUser, showToast]); // Removed activeWorkspaceId from deps to prevent loops
+
+  // 3. Fetch Projects & Teams when Active Workspace changes
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+
+    const loadWorkspaceData = async () => {
+       try {
            const [projs, tms] = await Promise.all([
              api.getProjects(activeWorkspaceId),
              api.getTeams(activeWorkspaceId)
@@ -155,20 +195,19 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
            setAllProjects(projs);
            setAllTeams(tms);
            
-           // Default active project
-           if (!activeProjectId && projs.length > 0) {
+           // Auto-select first project if none selected or current selection is invalid
+           const currentProjectValid = projs.some(p => p.id === activeProjectId);
+           if ((!activeProjectId || !currentProjectValid) && projs.length > 0) {
               setActiveProjectId(projs[0].id);
            }
-        }
-      } catch (e) {
-        console.error("Failed to fetch workspace data", e);
-        showToast("Failed to load workspace data", "error");
-      }
+       } catch (e) {
+           console.error("Error loading workspace data:", e);
+       }
     };
-    fetchData();
-  }, [currentUser, activeWorkspaceId, showToast]);
+    loadWorkspaceData();
+  }, [activeWorkspaceId]); // activeProjectId removed from deps
 
-  // Fetch Project Specific Data
+  // 4. Fetch Issues/Sprints/Epics when Active Project changes
   useEffect(() => {
      if (!activeProjectId) return;
      const fetchProjectData = async () => {
@@ -182,7 +221,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setAllSprints(sps);
           setAllEpics(eps);
         } catch (e) {
-          console.error("Failed to fetch project data", e);
+          console.error("Failed to fetch project details", e);
         }
      };
      fetchProjectData();
@@ -208,72 +247,93 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const login = async (email: string, password?: string) => {
     if (isSupabaseConfigured && password) {
+      setIsLoading(true);
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         showToast(error.message, "error");
+        setIsLoading(false);
       } else {
         showToast("Welcome back!", "success");
+        // State update happens in onAuthStateChange
       }
     } else {
-      showToast("Supabase not configured. Please connect a backend.", "error");
+      showToast("Supabase not configured.", "error");
     }
   };
 
   const signup = async (name: string, email: string, workspaceName: string, role: string, password?: string) => {
     if (isSupabaseConfigured && password) {
-       const { data: authData, error: authError } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name } } });
-       if (authError) {
-         showToast(authError.message, "error");
-         return;
-       }
-       if (authData.user) {
-         // Note: Triggers in SQL usually handle profile creation. 
-         const userId = authData.user.id;
-         const workspaceId = `ws-${Date.now()}`;
-         
-         const newUser: User = {
-            id: userId,
-            name,
-            email,
-            avatar: `https://ui-avatars.com/api/?name=${name}&background=random`,
-            role, 
-            workspaceIds: [workspaceId]
-         };
-         
-         const newWorkspace: Workspace = {
-            id: workspaceId,
-            name: workspaceName,
-            ownerId: userId,
-            members: [userId]
-         };
+       setIsLoading(true);
+       try {
+           // 1. Sign up user
+           const { data: authData, error: authError } = await supabase.auth.signUp({ 
+               email, 
+               password, 
+               options: { data: { full_name: name } } 
+           });
+           
+           if (authError) throw authError;
+           
+           if (authData.user) {
+             const userId = authData.user.id;
+             const workspaceId = `ws-${Date.now()}`;
+             const projectId = `p-${Date.now()}`;
+             
+             // 2. Prepare Default Data
+             const newWorkspace: Workspace = {
+                id: workspaceId,
+                name: workspaceName,
+                ownerId: userId,
+                members: [userId]
+             };
 
-         const newProject: Project = {
-           id: `p-${Date.now()}`,
-           workspaceId,
-           name: 'My First Project',
-           key: 'PROJ',
-           description: 'Your first project',
-           leadId: userId,
-           type: 'software'
-         };
+             const newProject: Project = {
+               id: projectId,
+               workspaceId,
+               name: 'My First Project',
+               key: 'PROJ',
+               description: 'Your first project',
+               leadId: userId,
+               type: 'software'
+             };
 
-         try {
-             // In a real app with triggers, we might skip profile insertion if trigger exists
-             const { error: profileError } = await supabase.from('profiles').upsert(newUser);
-             if(!profileError) {
-                await supabase.from('workspaces').insert(newWorkspace);
-                await supabase.from('projects').insert(newProject);
-             }
+             const userProfileUpdate = {
+                id: userId,
+                name,
+                email,
+                avatar: `https://ui-avatars.com/api/?name=${name}&background=random`,
+                role, 
+                workspaceIds: [workspaceId]
+             };
 
+             // 3. Sequential Inserts to ensure consistency
+             // We upsert profile first (in case trigger already ran)
+             const { error: profileError } = await supabase.from('profiles').upsert(userProfileUpdate);
+             if (profileError) throw profileError;
+
+             const { error: wsError } = await supabase.from('workspaces').insert(newWorkspace);
+             if (wsError) throw wsError;
+
+             const { error: projError } = await supabase.from('projects').insert(newProject);
+             if (projError) throw projError;
+
+             // 4. Optimistic State Update (Critical for immediate UX)
+             setCurrentUser(userProfileUpdate as User);
+             setWorkspaces([newWorkspace]);
+             setAllProjects([newProject]);
              setActiveWorkspaceId(workspaceId);
-             setActiveProjectId(newProject.id);
+             setActiveProjectId(projectId);
+             
              showToast("Account created successfully!", "success");
-         } catch (e: any) {
-             showToast(`Error setting up account: ${e.message}`, "error");
-         }
+           }
+       } catch (e: any) {
+           console.error("Signup failed:", e);
+           showToast(e.message || "Signup failed", "error");
+       } finally {
+           setIsLoading(false);
        }
     } else {
-      showToast("Supabase not configured. Please connect a backend.", "error");
+      showToast("Supabase not configured.", "error");
     }
   };
 
@@ -282,16 +342,23 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       await supabase.auth.signOut();
     }
     setCurrentUser(null);
-    localStorage.removeItem('vibetrack-user');
+    setWorkspaces([]);
+    setAllProjects([]);
+    setActiveWorkspaceId('');
+    setActiveProjectId('');
     showToast("Logged out successfully", "info");
   };
 
   const createProject = async (name: string, key: string, description: string, type: Project['type']) => {
     if (!activeWorkspace || !currentUser) return;
+    
+    // Check permission logic in UI or here? 
+    // We check locally, but RLS also protects.
     if (!checkPermission(Permission.CREATE_PROJECT)) {
         showToast("You do not have permission to create projects.", "error");
         return;
     }
+
     const newProject: Project = {
       id: `p-${Date.now()}`,
       workspaceId: activeWorkspace.id,
@@ -299,10 +366,14 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       leadId: currentUser.id
     };
     
-    await api.createProject(newProject);
-    setAllProjects(prev => [...prev, newProject]);
-    setActiveProjectId(newProject.id);
-    showToast("Project created successfully", "success");
+    try {
+        await api.createProject(newProject);
+        setAllProjects(prev => [...prev, newProject]);
+        setActiveProjectId(newProject.id);
+        showToast("Project created successfully", "success");
+    } catch (e) {
+        showToast("Failed to create project", "error");
+    }
   };
 
   const createTeam = async (name: string, memberIds: string[]) => {
@@ -321,6 +392,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const inviteUser = async (email: string) => {
       if (!activeWorkspace) return;
+      // In a real app, this would send an email or create an invite record.
+      // Here we simulate by adding if they exist in the DB.
       const existingUser = users.find(u => u.email === email);
       if (existingUser) {
           if (!activeWorkspace.members.includes(existingUser.id)) {
@@ -335,7 +408,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
               showToast(`${email} is already in the workspace.`, "info");
           }
       } else {
-          showToast(`Invitation sent to ${email}`, "success");
+          // This is a limitation of the demo/simple version. 
+          // Real Supabase invites use `supabase.auth.admin.inviteUserByEmail` (backend only)
+          showToast(`User ${email} not found in system. They must sign up first.`, "info");
       }
   };
 
@@ -371,12 +446,14 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     
     const newItem = { ...updatedIssue, ...updates, updatedAt: new Date().toISOString() };
     
+    // Optimistic Update
     setAllIssues(prev => prev.map(issue => issue.id === id ? newItem : issue));
     
     try {
         await api.updateIssue(newItem);
     } catch (e) {
          console.error("Failed to update issue", e);
+         // Revert
          setAllIssues(prev => prev.map(issue => issue.id === id ? updatedIssue : issue));
          showToast("Failed to update issue", "error");
     }
@@ -470,13 +547,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   return (
     <ProjectContext.Provider value={{ 
       workspaces, projects, teams, issues, users, sprints, epics, notifications,
-      activeWorkspace, activeProject, activeSprint, currentUser, searchQuery, isAuthenticated: !!currentUser,
+      activeWorkspace, activeProject, activeSprint, currentUser, searchQuery, isAuthenticated: !!currentUser, isLoading,
       login, signup, logout, setActiveWorkspace: setActiveWorkspaceId, setActiveProject: setActiveProjectId, createProject,
       setSearchQuery, addIssue, updateIssue, deleteIssue, addComment, createSprint, startSprint, completeSprint,
       createTeam, inviteUser, updateProjectInfo, updateUser, markNotificationRead, clearNotifications, checkPermission,
       toasts, showToast, removeToast
     }}>
-      {!loading && children}
+      {children}
     </ProjectContext.Provider>
   );
 };
