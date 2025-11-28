@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useProject } from '../store/ProjectContext';
 import { Zap, Mail, Lock, User, Building, ArrowRight, Briefcase } from 'lucide-react';
+import { UserRole } from '../types';
 
 export const Auth: React.FC = () => {
   const { login, signup } = useProject();
@@ -9,7 +10,9 @@ export const Auth: React.FC = () => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [workspaceName, setWorkspaceName] = useState('');
-  const [role, setRole] = useState('Developer');
+  
+  // Default to Founder for new signups as they are creating the workspace
+  const role = UserRole.FOUNDER;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,26 +96,6 @@ export const Auth: React.FC = () => {
                         className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
                         placeholder="Acme Corp"
                       />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Role</label>
-                    <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Briefcase className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                      </div>
-                      <select 
-                        value={role}
-                        onChange={(e) => setRole(e.target.value)}
-                        className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm appearance-none"
-                      >
-                        <option value="Founder">Founder</option>
-                        <option value="Product Manager">Product Manager</option>
-                        <option value="Developer">Developer</option>
-                        <option value="Designer">Designer</option>
-                        <option value="QA Engineer">QA Engineer</option>
-                        <option value="Operations">Operations</option>
-                      </select>
                     </div>
                   </div>
                 </div>

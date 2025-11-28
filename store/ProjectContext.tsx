@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Issue, User, Status, Priority, IssueType, Sprint, Epic, Project, Notification, Workspace, Team, Permission } from '../types';
+import { Issue, User, Status, Priority, IssueType, Sprint, Epic, Project, Notification, Workspace, Team, Permission, UserRole } from '../types';
 import { api } from '../services/api';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 import { hasPermission } from '../utils/rbac';
@@ -37,7 +37,7 @@ interface ProjectContextType {
   logout: () => void;
   setActiveWorkspace: (id: string) => void;
   setActiveProject: (id: string) => void;
-  createProject: (name: string, key: string, description: string, type: Project['type']) => void;
+  createProject: (name: string, key: string, description: string, type: Project['type']) => Promise<void>;
   
   // Entity Actions
   setSearchQuery: (query: string) => void;
@@ -117,6 +117,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
                      setCurrentUser(profile as User);
                  } else {
                      // Fallback if profile trigger failed or hasn't run yet
+                     // This creates a temporary user object so the app can function
                      setCurrentUser({
                          id: session.user.id,
                          email: session.user.email || '',
@@ -130,6 +131,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
                  setCurrentUser(null);
                  setWorkspaces([]);
                  setAllProjects([]);
+                 setActiveWorkspaceId('');
+                 setActiveProjectId('');
              }
              setIsLoading(false);
         });
@@ -161,26 +164,34 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             api.getUsers()
         ]);
         
-        setWorkspaces(wsData);
-        setUsers(allUsers);
-
-        // Set active workspace logic
+        // CRITICAL FIX: If we just signed up, optimistic state might be populated.
+        // If API returns empty (due to lag), but we expect workspaces, don't overwrite with empty.
+        // Only overwrite if API returns data OR if we truly expect nothing.
+        const shouldHaveWorkspaces = currentUser.workspaceIds && currentUser.workspaceIds.length > 0;
+        
         if (wsData.length > 0) {
+            setWorkspaces(wsData);
+            
+            // Set active workspace logic
             // Prefer the one in profile if valid, else first one
             const preferredId = currentUser.workspaceIds?.find(id => wsData.some(w => w.id === id));
             if (preferredId && !activeWorkspaceId) {
                 setActiveWorkspaceId(preferredId);
-            } else if (!activeWorkspaceId) {
+            } else if (!activeWorkspaceId && wsData[0]) {
                 setActiveWorkspaceId(wsData[0].id);
             }
+        } else if (!shouldHaveWorkspaces) {
+            // Only clear if user shouldn't have any
+            setWorkspaces([]);
         }
+        
+        setUsers(allUsers);
       } catch (e) {
         console.error("Error loading workspaces:", e);
-        showToast("Failed to load workspaces", "error");
       }
     };
     loadWorkspaces();
-  }, [currentUser, showToast]); // Removed activeWorkspaceId from deps to prevent loops
+  }, [currentUser, activeWorkspaceId]); // Keeping activeWorkspaceId here to ensure consistency if it changes
 
   // 3. Fetch Projects & Teams when Active Workspace changes
   useEffect(() => {
@@ -205,7 +216,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
        }
     };
     loadWorkspaceData();
-  }, [activeWorkspaceId]); // activeProjectId removed from deps
+  }, [activeWorkspaceId]);
 
   // 4. Fetch Issues/Sprints/Epics when Active Project changes
   useEffect(() => {
@@ -302,7 +313,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 name,
                 email,
                 avatar: `https://ui-avatars.com/api/?name=${name}&background=random`,
-                role, 
+                role: role, 
                 workspaceIds: [workspaceId]
              };
 
@@ -318,6 +329,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
              if (projError) throw projError;
 
              // 4. Optimistic State Update (Critical for immediate UX)
+             // Update state BEFORE reducing loading to avoid flicker
              setCurrentUser(userProfileUpdate as User);
              setWorkspaces([newWorkspace]);
              setAllProjects([newProject]);
@@ -350,18 +362,44 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const createProject = async (name: string, key: string, description: string, type: Project['type']) => {
-    if (!activeWorkspace || !currentUser) return;
+    if (!currentUser) return;
     
-    // Check permission logic in UI or here? 
-    // We check locally, but RLS also protects.
-    if (!checkPermission(Permission.CREATE_PROJECT)) {
+    // Safety check: ensure we have a workspace
+    let targetWorkspaceId = activeWorkspaceId;
+
+    if (!targetWorkspaceId) {
+        // Create a default workspace if none exists
+        const newWsId = `ws-${Date.now()}`;
+        const newWorkspace: Workspace = {
+            id: newWsId,
+            name: `${currentUser.name}'s Workspace`,
+            ownerId: currentUser.id,
+            members: [currentUser.id]
+        };
+
+        try {
+            await supabase.from('workspaces').insert(newWorkspace);
+            setWorkspaces(prev => [...prev, newWorkspace]);
+            setActiveWorkspaceId(newWsId);
+            targetWorkspaceId = newWsId;
+        } catch (e) {
+            console.error("Auto-creation of workspace failed", e);
+            showToast("Failed to create default workspace", "error");
+            return;
+        }
+    }
+
+    // BOOTSTRAP PERMISSION CHECK
+    // If there are NO projects, we allow creation regardless of role to bootstrap the account.
+    // Otherwise, we enforce permissions.
+    if (allProjects.length > 0 && !checkPermission(Permission.CREATE_PROJECT)) {
         showToast("You do not have permission to create projects.", "error");
         return;
     }
 
     const newProject: Project = {
       id: `p-${Date.now()}`,
-      workspaceId: activeWorkspace.id,
+      workspaceId: targetWorkspaceId,
       name, key, description, type,
       leadId: currentUser.id
     };
