@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useProject } from '../store/ProjectContext';
-import { User, CheckCircle, Clock, PieChart as PieIcon } from 'lucide-react';
-import { Status } from '../types';
+import { User, CheckCircle, Clock, PieChart as PieIcon, Briefcase } from 'lucide-react';
+import { Status, UserRole } from '../types';
 
 export const Profile: React.FC = () => {
   const { currentUser, updateUser, issues } = useProject();
@@ -75,13 +75,19 @@ export const Profile: React.FC = () => {
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-1">Job Title</label>
-                        <input 
-                            type="text" 
-                            value={role}
-                            onChange={(e) => setRole(e.target.value)}
-                            className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                        />
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">Role / Job Title</label>
+                        <div className="relative">
+                            <select 
+                                value={role}
+                                onChange={(e) => setRole(e.target.value)}
+                                className="w-full border border-slate-300 rounded-lg p-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none appearance-none bg-white"
+                            >
+                                {Object.values(UserRole).map(r => (
+                                    <option key={r} value={r}>{r}</option>
+                                ))}
+                            </select>
+                            <Briefcase className="absolute right-3 top-2.5 w-5 h-5 text-slate-400 pointer-events-none" />
+                        </div>
                     </div>
                 </div>
 
