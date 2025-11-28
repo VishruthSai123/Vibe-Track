@@ -34,6 +34,7 @@ interface ProjectContextType {
   // Actions
   login: (email: string, password?: string) => Promise<void>;
   signup: (name: string, email: string, workspaceName: string, role: string, password?: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   logout: () => void;
   setActiveWorkspace: (id: string) => void;
   setActiveProject: (id: string) => void;
@@ -49,6 +50,8 @@ interface ProjectContextType {
   startSprint: (sprintId: string, startDate: string, endDate: string, goal?: string) => void;
   completeSprint: (sprintId: string, spilloverAction: 'BACKLOG' | 'NEXT_SPRINT') => void;
   createTeam: (name: string, memberIds: string[]) => void;
+  addMemberToTeam: (teamId: string, userId: string) => void;
+  removeMemberFromTeam: (teamId: string, userId: string) => void;
   inviteUser: (email: string) => Promise<void>;
   updateProjectInfo: (info: Project) => void;
   updateUser: (userId: string, updates: Partial<User>) => void;
@@ -56,6 +59,7 @@ interface ProjectContextType {
   clearNotifications: () => void;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   removeToast: (id: string) => void;
+  uploadAttachment: (file: File) => Promise<string>;
   
   // RBAC
   checkPermission: (permission: Permission) => boolean;
@@ -83,6 +87,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>('');
   const [activeProjectId, setActiveProjectId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Derived Auth State
+  const isAuthenticated = !!currentUser;
 
   // Toast Helper
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -128,19 +135,27 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             if (profile) {
                 userObj = profile as User;
             } else {
-                // Fallback
-                userObj = {
+                // Fallback & Self-Healing: Profile missing from DB. Try to insert it.
+                console.warn("User profile missing in DB. Attempting self-healing insert.");
+                const newProfile = {
                     id: session.user.id,
                     email: session.user.email || '',
                     name: session.user.user_metadata.full_name || 'User',
                     role: 'Developer',
-                    avatar: '',
+                    avatar: `https://ui-avatars.com/api/?name=${session.user.user_metadata.full_name || 'U'}&background=random`,
                     workspaceIds: []
                 };
+                
+                const { error: insertError } = await supabase.from('profiles').insert(newProfile);
+                if (insertError) {
+                     console.error("Self-healing profile insert failed:", JSON.stringify(insertError, null, 2));
+                     // We continue locally, but DB operations might fail if they rely on this row existence
+                }
+                
+                userObj = newProfile;
             }
 
             // 2. Fetch Workspaces & Users (Parallel)
-            // We fetch these BEFORE setting loading=false to avoid UI flash
             const [wsData, allUsers] = await Promise.all([
                 api.getWorkspaces(),
                 api.getUsers()
@@ -159,7 +174,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     setWorkspaces(wsData);
                     
                     // Set active workspace logic
-                    // Prefer the one in profile if valid, else first one
                     const preferredId = userObj.workspaceIds?.find(id => wsData.some(w => w.id === id));
                     
                     if (preferredId) {
@@ -213,7 +227,59 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   }, []);
 
-  // 2. Fetch Projects & Teams when Active Workspace changes
+  // 2. REAL-TIME SUBSCRIPTIONS
+  useEffect(() => {
+    if (!isAuthenticated || !activeProjectId) return;
+
+    // Subscribe to Issues, Sprints, Epics changes for the active project
+    const channel = supabase.channel(`project-${activeProjectId}`)
+        .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'issues', filter: `projectId=eq.${activeProjectId}` }, 
+            (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    setAllIssues(prev => {
+                        // Anti-duplication: Check if ID already exists (e.g. from optimistic update or race condition)
+                        if (prev.some(i => i.id === payload.new.id)) return prev;
+                        return [...prev, payload.new as Issue];
+                    });
+                } else if (payload.eventType === 'UPDATE') {
+                    setAllIssues(prev => prev.map(i => i.id === payload.new.id ? payload.new as Issue : i));
+                } else if (payload.eventType === 'DELETE') {
+                    setAllIssues(prev => prev.filter(i => i.id !== payload.old.id));
+                }
+            }
+        )
+        .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'sprints', filter: `projectId=eq.${activeProjectId}` }, 
+            (payload) => {
+                if (payload.eventType === 'INSERT') {
+                    setAllSprints(prev => {
+                        if (prev.some(s => s.id === payload.new.id)) return prev;
+                        return [...prev, payload.new as Sprint];
+                    });
+                } else if (payload.eventType === 'UPDATE') {
+                    setAllSprints(prev => prev.map(s => s.id === payload.new.id ? payload.new as Sprint : s));
+                }
+            }
+        )
+        .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'notifications', filter: `userId=eq.${currentUser?.id}` }, 
+            (payload) => {
+                 if (payload.eventType === 'INSERT') {
+                     setNotifications(prev => [payload.new as Notification, ...prev]);
+                     showToast(`New Notification: ${(payload.new as Notification).title}`, 'info');
+                 }
+            }
+        )
+        .subscribe();
+
+    return () => {
+        supabase.removeChannel(channel);
+    };
+  }, [isAuthenticated, activeProjectId, currentUser]);
+
+
+  // 3. Fetch Projects & Teams when Active Workspace changes
   useEffect(() => {
     if (!activeWorkspaceId) return;
 
@@ -238,7 +304,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     loadWorkspaceData();
   }, [activeWorkspaceId]);
 
-  // 3. Fetch Issues/Sprints/Epics when Active Project changes
+  // 4. Fetch Issues/Sprints/Epics when Active Project changes
   useEffect(() => {
      if (!activeProjectId) return;
      const fetchProjectData = async () => {
@@ -285,7 +351,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setIsLoading(false);
       } else {
         showToast("Welcome back!", "success");
-        // State update happens in onAuthStateChange
       }
     } else {
       showToast("Supabase not configured.", "error");
@@ -303,14 +368,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
                options: { data: { full_name: name } } 
            });
            
-           if (authError) throw authError;
+           if (authError) {
+               throw new Error(authError.message || "Authentication failed during signup");
+           }
            
            if (authData.user) {
              const userId = authData.user.id;
              const workspaceId = `ws-${Date.now()}`;
              const projectId = `p-${Date.now()}`;
              
-             // 2. Prepare Default Data
+             // 2. Prepare Data
              const newWorkspace: Workspace = {
                 id: workspaceId,
                 name: workspaceName,
@@ -337,19 +404,26 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 workspaceIds: [workspaceId]
              };
 
-             // 3. Sequential Inserts to ensure consistency
-             // We upsert profile first (in case trigger already ran)
+             // 3. Sequential Inserts with Strict Validation
              const { error: profileError } = await supabase.from('profiles').upsert(userProfileUpdate);
-             if (profileError) throw profileError;
+             if (profileError) {
+                 console.warn("Profile upsert returned error:", profileError);
+                 const { data: exists } = await supabase.from('profiles').select('id').eq('id', userId).maybeSingle();
+                 if (!exists) {
+                     const { error: insertError } = await supabase.from('profiles').insert(userProfileUpdate);
+                     if (insertError) {
+                         throw new Error(`Failed to create user profile: ${insertError.message}`);
+                     }
+                 }
+             }
 
              const { error: wsError } = await supabase.from('workspaces').insert(newWorkspace);
-             if (wsError) throw wsError;
+             if (wsError) throw new Error(`Failed to create workspace: ${wsError.message}`);
 
              const { error: projError } = await supabase.from('projects').insert(newProject);
-             if (projError) throw projError;
+             if (projError) throw new Error(`Failed to create project: ${projError.message}`);
 
-             // 4. Optimistic State Update (Critical for immediate UX)
-             // Update state BEFORE reducing loading to avoid flicker
+             // 4. Optimistic State Update
              setCurrentUser(userProfileUpdate as User);
              setWorkspaces([newWorkspace]);
              setAllProjects([newProject]);
@@ -360,10 +434,51 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
            }
        } catch (e: any) {
            console.error("Signup failed:", e);
-           showToast(e.message || "Signup failed", "error");
+           
+           let msg = "Unknown error";
+           if (e instanceof Error) {
+               msg = e.message;
+           } else if (e?.message) {
+               msg = e.message;
+           } else if (typeof e === 'string') {
+               msg = e;
+           } else if (typeof e === 'object') {
+               try {
+                   msg = JSON.stringify(e);
+                   if (msg === '{}') msg = "An unknown error occurred during signup.";
+               } catch {
+                   msg = "An error occurred (details unavailable).";
+               }
+           }
+           
+           if (msg.toLowerCase().includes("already registered") || msg.toLowerCase().includes("user already exists")) {
+               showToast("This email is already registered. Please log in.", "info");
+           } else {
+               showToast(`Signup failed: ${msg}`, "error");
+           }
        } finally {
            setIsLoading(false);
        }
+    } else {
+      showToast("Supabase not configured.", "error");
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    if (isSupabaseConfigured) {
+      setIsLoading(true);
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.href,
+        });
+        if (error) throw error;
+        showToast("Password reset link sent to your email.", "success");
+      } catch (e: any) {
+        console.error("Reset password error:", e);
+        showToast(e.message || "Failed to send reset email", "error");
+      } finally {
+        setIsLoading(false);
+      }
     } else {
       showToast("Supabase not configured.", "error");
     }
@@ -384,11 +499,34 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const createProject = async (name: string, key: string, description: string, type: Project['type']) => {
     if (!currentUser) return;
     
-    // Safety check: ensure we have a workspace
+    // --- 1. SELF-HEALING: Profile Verification ---
+    try {
+        const { data: profileExists, error: fetchError } = await supabase.from('profiles').select('id').eq('id', currentUser.id).maybeSingle();
+        
+        if (!profileExists) {
+            console.warn("Profile check failed. Attempting self-healing insert.");
+            const { error: recoveryError } = await supabase.from('profiles').insert({
+                id: currentUser.id,
+                name: currentUser.name || 'User',
+                email: currentUser.email,
+                avatar: currentUser.avatar || `https://ui-avatars.com/api/?name=${currentUser.name || 'U'}&background=random`,
+                role: currentUser.role || 'Developer'
+            });
+
+            if (recoveryError) {
+                console.error("Profile recovery failed:", JSON.stringify(recoveryError, null, 2));
+                showToast("Account Error: We couldn't verify your profile. Please try refreshing.", "error");
+                return; 
+            }
+        }
+    } catch (e) {
+        console.error("Profile verification error", e);
+    }
+
+    // --- 2. Workspace Verification/Creation ---
     let targetWorkspaceId = activeWorkspaceId;
 
     if (!targetWorkspaceId) {
-        // Create a default workspace if none exists
         const newWsId = `ws-${Date.now()}`;
         const newWorkspace: Workspace = {
             id: newWsId,
@@ -397,26 +535,25 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             members: [currentUser.id]
         };
 
-        try {
-            await supabase.from('workspaces').insert(newWorkspace);
-            setWorkspaces(prev => [...prev, newWorkspace]);
-            setActiveWorkspaceId(newWsId);
-            targetWorkspaceId = newWsId;
-        } catch (e) {
-            console.error("Auto-creation of workspace failed", e);
-            showToast("Failed to create default workspace", "error");
+        const { error: wsError } = await supabase.from('workspaces').insert(newWorkspace);
+        if (wsError) {
+            console.error("Auto-creation of workspace failed", JSON.stringify(wsError, null, 2));
+            showToast(`Failed to create default workspace: ${wsError.message}`, "error");
             return;
         }
+
+        setWorkspaces(prev => [...prev, newWorkspace]);
+        setActiveWorkspaceId(newWsId);
+        targetWorkspaceId = newWsId;
     }
 
-    // BOOTSTRAP PERMISSION CHECK
-    // If there are NO projects, we allow creation regardless of role to bootstrap the account.
-    // Otherwise, we enforce permissions.
+    // --- 3. Permission Check ---
     if (allProjects.length > 0 && !checkPermission(Permission.CREATE_PROJECT)) {
         showToast("You do not have permission to create projects.", "error");
         return;
     }
 
+    // --- 4. Create Project ---
     const newProject: Project = {
       id: `p-${Date.now()}`,
       workspaceId: targetWorkspaceId,
@@ -429,8 +566,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setAllProjects(prev => [...prev, newProject]);
         setActiveProjectId(newProject.id);
         showToast("Project created successfully", "success");
-    } catch (e) {
-        showToast("Failed to create project", "error");
+    } catch (e: any) {
+        console.error("Failed to create project", e);
+        showToast(`Failed to create project: ${e.message}`, "error");
     }
   };
 
@@ -448,10 +586,42 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       showToast("Team created", "success");
   };
 
+  const addMemberToTeam = async (teamId: string, userId: string) => {
+      const team = allTeams.find(t => t.id === teamId);
+      if (!team || team.members.includes(userId)) return;
+      
+      const updatedTeam = { ...team, members: [...team.members, userId] };
+      setAllTeams(prev => prev.map(t => t.id === teamId ? updatedTeam : t)); // Optimistic
+      
+      try {
+          await api.updateTeam(updatedTeam);
+          showToast("Member added", "success");
+      } catch (e) {
+          console.error(e);
+          setAllTeams(prev => prev.map(t => t.id === teamId ? team : t)); // Revert
+          showToast("Failed to add member", "error");
+      }
+  };
+
+  const removeMemberFromTeam = async (teamId: string, userId: string) => {
+      const team = allTeams.find(t => t.id === teamId);
+      if (!team) return;
+      
+      const updatedTeam = { ...team, members: team.members.filter(id => id !== userId) };
+      setAllTeams(prev => prev.map(t => t.id === teamId ? updatedTeam : t)); // Optimistic
+      
+      try {
+          await api.updateTeam(updatedTeam);
+          showToast("Member removed", "success");
+      } catch (e) {
+          console.error(e);
+          setAllTeams(prev => prev.map(t => t.id === teamId ? team : t)); // Revert
+          showToast("Failed to remove member", "error");
+      }
+  };
+
   const inviteUser = async (email: string) => {
       if (!activeWorkspace) return;
-      // In a real app, this would send an email or create an invite record.
-      // Here we simulate by adding if they exist in the DB.
       const existingUser = users.find(u => u.email === email);
       if (existingUser) {
           if (!activeWorkspace.members.includes(existingUser.id)) {
@@ -466,8 +636,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
               showToast(`${email} is already in the workspace.`, "info");
           }
       } else {
-          // This is a limitation of the demo/simple version. 
-          // Real Supabase invites use `supabase.auth.admin.inviteUserByEmail` (backend only)
           showToast(`User ${email} not found in system. They must sign up first.`, "info");
       }
   };
@@ -475,12 +643,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addIssue = async (newIssue: Omit<Issue, 'id' | 'createdAt' | 'updatedAt' | 'comments' | 'subtasks' | 'attachments' | 'projectId'>) => {
     if (!activeProject) return;
     
-    const tempId = `${activeProject.key}-${100 + issues.length + 1}`;
+    const suffix = Date.now().toString().slice(-4); 
+    const readableId = `${activeProject.key}-${suffix}`;
     
     const issue: Issue = {
       ...newIssue,
       projectId: activeProject.id,
-      id: tempId,
+      id: readableId, 
       comments: [], subtasks: [], attachments: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -490,10 +659,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     showToast("Issue created", "success");
 
     try {
-        await api.createIssue(issue);
+        const createdIssue = await api.createIssue({ ...newIssue, projectId: activeProject.id, id: readableId } as Issue);
+        setAllIssues(prev => {
+             if (prev.some(i => i.id === createdIssue.id && i !== issue)) {
+                 return prev.filter(i => i.id !== readableId);
+             }
+             return prev.map(i => i.id === readableId ? createdIssue : i);
+        });
     } catch (e) {
         console.error("Failed to create issue", e);
-        setAllIssues(prev => prev.filter(i => i.id !== tempId));
+        setAllIssues(prev => prev.filter(i => i.id !== readableId));
         showToast("Failed to create issue on server", "error");
     }
   };
@@ -504,14 +679,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     
     const newItem = { ...updatedIssue, ...updates, updatedAt: new Date().toISOString() };
     
-    // Optimistic Update
     setAllIssues(prev => prev.map(issue => issue.id === id ? newItem : issue));
     
     try {
         await api.updateIssue(newItem);
     } catch (e) {
          console.error("Failed to update issue", e);
-         // Revert
          setAllIssues(prev => prev.map(issue => issue.id === id ? updatedIssue : issue));
          showToast("Failed to update issue", "error");
     }
@@ -546,7 +719,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       id: `sp-${Date.now()}`, projectId: activeProject.id, name, goal, status: 'PLANNED', capacity
     };
     await api.createSprint(newSprint);
-    setAllSprints(prev => [...prev, newSprint]);
     showToast("Sprint created", "success");
   };
 
@@ -558,7 +730,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const updatedSprint = { ...sprint, ...updates };
 
     await api.updateSprint(updatedSprint);
-    setAllSprints(prev => prev.map(s => s.id === sprintId ? updatedSprint : s));
     showToast(`${sprint.name} started!`, "success");
   };
 
@@ -567,7 +738,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!sprint) return;
 
     await api.updateSprint({ ...sprint, status: 'COMPLETED' });
-    setAllSprints(prev => prev.map(s => s.id === sprintId ? { ...s, status: 'COMPLETED' } : s));
     
     let nextSprintId: string | null = null;
     if (spilloverAction === 'NEXT_SPRINT') {
@@ -599,6 +769,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     showToast("Profile updated", "success");
   };
 
+  const uploadAttachment = async (file: File): Promise<string> => {
+      try {
+          return await api.uploadFile(file);
+      } catch (e: any) {
+          showToast(e.message, "error");
+          throw e;
+      }
+  };
+
   const markNotificationRead = (id: string) => setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   const clearNotifications = () => setNotifications([]);
 
@@ -606,10 +785,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     <ProjectContext.Provider value={{ 
       workspaces, projects, teams, issues, users, sprints, epics, notifications,
       activeWorkspace, activeProject, activeSprint, currentUser, searchQuery, isAuthenticated: !!currentUser, isLoading,
-      login, signup, logout, setActiveWorkspace: setActiveWorkspaceId, setActiveProject: setActiveProjectId, createProject,
+      login, signup, logout, resetPassword, setActiveWorkspace: setActiveWorkspaceId, setActiveProject: setActiveProjectId, createProject,
       setSearchQuery, addIssue, updateIssue, deleteIssue, addComment, createSprint, startSprint, completeSprint,
-      createTeam, inviteUser, updateProjectInfo, updateUser, markNotificationRead, clearNotifications, checkPermission,
-      toasts, showToast, removeToast
+      createTeam, addMemberToTeam, removeMemberFromTeam, inviteUser, updateProjectInfo, updateUser, markNotificationRead, clearNotifications, checkPermission,
+      toasts, showToast, removeToast, uploadAttachment
     }}>
       {children}
     </ProjectContext.Provider>

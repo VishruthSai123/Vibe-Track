@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useProject } from '../store/ProjectContext';
-import { Zap, Mail, Lock, User, Building, ArrowRight, Briefcase } from 'lucide-react';
+import { Zap, Mail, Lock, User, Building, ArrowRight, Briefcase, Loader2, ArrowLeft } from 'lucide-react';
 import { UserRole } from '../types';
 
 export const Auth: React.FC = () => {
-  const { login, signup } = useProject();
-  const [mode, setMode] = useState<'LOGIN' | 'SIGNUP'>('LOGIN');
+  const { login, signup, resetPassword, isLoading } = useProject();
+  const [mode, setMode] = useState<'LOGIN' | 'SIGNUP' | 'FORGOT'>('LOGIN');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -14,10 +14,14 @@ export const Auth: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
+    
     if (mode === 'LOGIN') {
       login(email, password);
-    } else {
+    } else if (mode === 'SIGNUP') {
       signup(name, email, workspaceName, role, password);
+    } else if (mode === 'FORGOT') {
+      resetPassword(email);
     }
   };
 
@@ -44,22 +48,31 @@ export const Auth: React.FC = () => {
           <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white/50 w-full animate-fade-in-up delay-100">
             
             {/* Toggle Switch */}
-            <div className="bg-slate-100/80 p-1.5 rounded-xl flex mb-8 relative">
-              <button 
-                type="button"
-                className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 z-10 ${mode === 'LOGIN' ? 'text-indigo-900 shadow-sm bg-white' : 'text-slate-500 hover:text-slate-700'}`}
-                onClick={() => setMode('LOGIN')}
-              >
-                Log In
-              </button>
-              <button 
-                type="button"
-                className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 z-10 ${mode === 'SIGNUP' ? 'text-indigo-900 shadow-sm bg-white' : 'text-slate-500 hover:text-slate-700'}`}
-                onClick={() => setMode('SIGNUP')}
-              >
-                Sign Up
-              </button>
-            </div>
+            {mode !== 'FORGOT' && (
+                <div className="bg-slate-100/80 p-1.5 rounded-xl flex mb-8 relative">
+                <button 
+                    type="button"
+                    className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 z-10 ${mode === 'LOGIN' ? 'text-indigo-900 shadow-sm bg-white' : 'text-slate-500 hover:text-slate-700'}`}
+                    onClick={() => setMode('LOGIN')}
+                >
+                    Log In
+                </button>
+                <button 
+                    type="button"
+                    className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 z-10 ${mode === 'SIGNUP' ? 'text-indigo-900 shadow-sm bg-white' : 'text-slate-500 hover:text-slate-700'}`}
+                    onClick={() => setMode('SIGNUP')}
+                >
+                    Sign Up
+                </button>
+                </div>
+            )}
+
+            {mode === 'FORGOT' && (
+                <div className="mb-8 text-center animate-fade-in-up">
+                    <h3 className="text-xl font-bold text-slate-800">Reset Password</h3>
+                    <p className="text-sm text-slate-500 mt-2">Enter your email to receive a reset link.</p>
+                </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {mode === 'SIGNUP' && (
@@ -136,36 +149,59 @@ export const Auth: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Password</label>
-                <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                  </div>
-                  <input 
-                    type="password" 
-                    required 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
-                    placeholder="••••••••"
-                  />
+              {mode !== 'FORGOT' && (
+                <div>
+                    <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1.5 ml-1">Password</label>
+                    <div className="relative group">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                    </div>
+                    <input 
+                        type="password" 
+                        required 
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="block w-full pl-10 pr-3 py-3 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-sm"
+                        placeholder="••••••••"
+                    />
+                    </div>
                 </div>
-              </div>
+              )}
 
               <button 
                 type="submit" 
-                className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-200 transform transition-all active:scale-[0.98] flex items-center justify-center space-x-2 mt-2"
+                disabled={isLoading}
+                className={`w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-200 transform transition-all active:scale-[0.98] flex items-center justify-center space-x-2 mt-2 ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
               >
-                <span>{mode === 'LOGIN' ? 'Sign In' : 'Create Account'}</span>
-                <ArrowRight className="w-5 h-5" />
+                {isLoading ? (
+                    <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Processing...</span>
+                    </>
+                ) : (
+                    <>
+                        <span>{mode === 'LOGIN' ? 'Sign In' : mode === 'SIGNUP' ? 'Create Account' : 'Send Reset Link'}</span>
+                        <ArrowRight className="w-5 h-5" />
+                    </>
+                )}
               </button>
             </form>
 
             {mode === 'LOGIN' && (
               <p className="mt-6 text-center text-sm text-slate-400">
-                Forgot your password? <a href="#" className="text-indigo-600 hover:text-indigo-700 font-semibold hover:underline">Reset here</a>
+                Forgot your password? <button type="button" onClick={() => setMode('FORGOT')} className="text-indigo-600 hover:text-indigo-700 font-semibold hover:underline">Reset here</button>
               </p>
+            )}
+
+            {mode === 'FORGOT' && (
+                <button 
+                    type="button" 
+                    onClick={() => setMode('LOGIN')}
+                    className="w-full mt-6 text-sm text-slate-500 hover:text-slate-800 font-medium flex items-center justify-center gap-2 transition-colors"
+                >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Sign In
+                </button>
             )}
           </div>
           

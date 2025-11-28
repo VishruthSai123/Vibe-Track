@@ -1,19 +1,10 @@
 import { Issue, Project, Workspace, User, Sprint, Epic, Team, Notification } from '../types';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 
-// --- FALLBACK MOCK DATA (For when Supabase isn't configured) ---
-const LOCAL_STORAGE_KEY = 'vibetrack-storage-v2';
-
-// Helper to get local data
-const getLocalData = () => {
-  const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-  return saved ? JSON.parse(saved) : null;
-};
-
 // Helper to handle Supabase errors
 const handleSupabaseError = (error: any) => {
   if (error) {
-    console.error("Supabase API Error:", error);
+    console.error("Supabase API Error:", JSON.stringify(error, null, 2));
     throw new Error(error.message || "Database error");
   }
 };
@@ -26,8 +17,7 @@ export const api = {
       handleSupabaseError(error);
       return data as User[];
     }
-    const data = getLocalData();
-    return data?.users || [];
+    return [];
   },
 
   getWorkspaces: async (): Promise<Workspace[]> => {
@@ -36,8 +26,7 @@ export const api = {
       handleSupabaseError(error);
       return data as Workspace[];
     }
-    const data = getLocalData();
-    return data?.workspaces || [];
+    return [];
   },
 
   updateWorkspace: async (workspace: Workspace): Promise<void> => {
@@ -54,8 +43,7 @@ export const api = {
       handleSupabaseError(error);
       return data as Project[];
     }
-    const data = getLocalData();
-    return data?.projects.filter((p: Project) => p.workspaceId === workspaceId) || [];
+    return [];
   },
 
   createProject: async (project: Project): Promise<Project> => {
@@ -64,7 +52,7 @@ export const api = {
       handleSupabaseError(error);
       return data as Project;
     }
-    return project;
+    throw new Error("Supabase not configured");
   },
 
   updateProject: async (project: Project): Promise<void> => {
@@ -81,25 +69,22 @@ export const api = {
       handleSupabaseError(error);
       return data as Issue[];
     }
-    const data = getLocalData();
-    return data?.issues.filter((i: Issue) => i.projectId === projectId) || [];
+    return [];
   },
 
   createIssue: async (issue: Issue): Promise<Issue> => {
     if (isSupabaseConfigured) {
-      // Clean up fields to match Schema expected types if necessary
       const payload = {
         ...issue,
         sprintId: issue.sprintId || null,
         epicId: issue.epicId || null,
         assigneeId: issue.assigneeId || null,
-        // JSONB fields are handled automatically by Supabase client if passed as objects/arrays
       };
       const { data, error } = await supabase.from('issues').insert(payload).select().single();
       handleSupabaseError(error);
       return data as Issue;
     }
-    return issue;
+    throw new Error("Supabase not configured");
   },
 
   updateIssue: async (issue: Issue): Promise<void> => {
@@ -129,8 +114,7 @@ export const api = {
       handleSupabaseError(error);
       return data as Sprint[];
     }
-    const data = getLocalData();
-    return data?.sprints.filter((s: Sprint) => s.projectId === projectId) || [];
+    return [];
   },
 
   createSprint: async (sprint: Sprint): Promise<Sprint> => {
@@ -156,8 +140,7 @@ export const api = {
       handleSupabaseError(error);
       return data as Epic[];
     }
-    const data = getLocalData();
-    return data?.epics.filter((e: Epic) => e.projectId === projectId) || [];
+    return [];
   },
 
   // --- TEAMS ---
@@ -167,8 +150,7 @@ export const api = {
       handleSupabaseError(error);
       return data as Team[];
     }
-    const data = getLocalData();
-    return data?.teams.filter((t: Team) => t.workspaceId === workspaceId) || [];
+    return [];
   },
 
   createTeam: async (team: Team): Promise<Team> => {
@@ -178,6 +160,13 @@ export const api = {
       return data as Team;
     }
     return team;
+  },
+
+  updateTeam: async (team: Team): Promise<void> => {
+    if (isSupabaseConfigured) {
+        const { error } = await supabase.from('teams').update({ members: team.members }).eq('id', team.id);
+        handleSupabaseError(error);
+    }
   },
 
   // --- NOTIFICATIONS ---
@@ -195,5 +184,29 @@ export const api = {
       const { error } = await supabase.from('notifications').insert(notif);
       if (error) console.error("Failed to send notification", error);
     }
+  },
+
+  // --- STORAGE ---
+  uploadFile: async (file: File): Promise<string> => {
+    if (isSupabaseConfigured) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('attachments')
+            .upload(filePath, file);
+
+        if (uploadError) {
+             throw new Error(`Upload failed: ${uploadError.message}`);
+        }
+
+        const { data } = supabase.storage
+            .from('attachments')
+            .getPublicUrl(filePath);
+
+        return data.publicUrl;
+    }
+    throw new Error("Supabase not configured");
   }
 };

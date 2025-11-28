@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Issue, Priority, Status, IssueType, User } from '../types';
 import { useProject } from '../store/ProjectContext';
-import { X, Bot, Paperclip, Send, Trash2, Calendar, User as UserIcon, CheckSquare, Plus, FileText, Download, Upload } from 'lucide-react';
+import { X, Bot, Paperclip, Send, Trash2, Calendar, User as UserIcon, CheckSquare, Plus, FileText, Download, Upload, Loader2 } from 'lucide-react';
 import { generateIssueDescription, suggestSubtasks, summarizeIssue } from '../services/geminiService';
 
 interface IssueModalProps {
@@ -10,12 +10,13 @@ interface IssueModalProps {
 }
 
 export const IssueModal: React.FC<IssueModalProps> = ({ issue, onClose }) => {
-  const { updateIssue, users, addComment, deleteIssue, sprints, epics, currentUser } = useProject();
+  const { updateIssue, users, addComment, deleteIssue, sprints, epics, currentUser, uploadAttachment, showToast } = useProject();
   const [description, setDescription] = useState(issue.description);
   const [title, setTitle] = useState(issue.title);
   const [newComment, setNewComment] = useState('');
   const [newSubtask, setNewSubtask] = useState('');
   const [isAiGenerating, setIsAiGenerating] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [aiSummary, setAiSummary] = useState(issue.summary || '');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -37,7 +38,7 @@ export const IssueModal: React.FC<IssueModalProps> = ({ issue, onClose }) => {
       const generated = await generateIssueDescription(title, issue.type);
       setDescription(prev => prev ? prev + '\n\n' + generated : generated);
     } catch (e) {
-      alert("Failed to generate description. Check API Key.");
+      showToast("Failed to generate description. Check API Key.", "error");
     } finally {
       setIsAiGenerating(false);
     }
@@ -111,27 +112,28 @@ export const IssueModal: React.FC<IssueModalProps> = ({ issue, onClose }) => {
       updateIssue(issue.id, { subtasks: updatedSubtasks });
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
       
-      if (file.size > 500 * 1024) {
-          alert("File is too large. Max 500KB allowed.");
-          return;
-      }
-
-      const reader = new FileReader();
-      reader.onloadend = () => {
-          const base64 = reader.result as string;
+      setIsUploading(true);
+      try {
+          const publicUrl = await uploadAttachment(file);
           const attachment = {
               id: `att-${Date.now()}`,
               name: file.name,
               type: file.type.split('/')[1] || 'file',
-              url: base64
+              url: publicUrl
           };
           updateIssue(issue.id, { attachments: [...issue.attachments, attachment] });
-      };
-      reader.readAsDataURL(file);
+          showToast("File uploaded successfully", "success");
+      } catch (error) {
+          console.error("Upload failed", error);
+          // Toast handled in context
+      } finally {
+          setIsUploading(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+      }
   };
 
   const removeAttachment = (attId: string) => {
@@ -428,10 +430,11 @@ export const IssueModal: React.FC<IssueModalProps> = ({ issue, onClose }) => {
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Attachments</label>
                     <button 
                         onClick={() => fileInputRef.current?.click()} 
-                        className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center space-x-1"
+                        disabled={isUploading}
+                        className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center space-x-1 disabled:opacity-50"
                     >
-                        <Upload className="w-3 h-3" />
-                        <span>Upload</span>
+                        {isUploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                        <span>{isUploading ? 'Uploading...' : 'Upload'}</span>
                     </button>
                     <input 
                         type="file" 
@@ -453,7 +456,7 @@ export const IssueModal: React.FC<IssueModalProps> = ({ issue, onClose }) => {
                                     <FileText className="w-4 h-4 text-slate-500" />
                                 </div>
                              )}
-                             <a href={att.url} download={att.name} className="text-xs text-slate-700 flex-1 truncate hover:underline">{att.name}</a>
+                             <a href={att.url} download={att.name} target="_blank" rel="noopener noreferrer" className="text-xs text-slate-700 flex-1 truncate hover:underline">{att.name}</a>
                              <button onClick={() => removeAttachment(att.id)} className="p-1 text-slate-400 hover:text-red-600">
                                  <X className="w-3 h-3" />
                              </button>
