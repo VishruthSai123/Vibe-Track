@@ -8,6 +8,7 @@ import { Settings } from './components/Settings';
 import { Profile } from './components/Profile';
 import { CreateIssueModal } from './components/CreateIssueModal';
 import { CreateProjectModal } from './components/CreateProjectModal';
+import { CreateWorkspaceModal } from './components/CreateWorkspaceModal';
 import { Auth } from './components/Auth';
 import { Teams } from './components/Teams';
 import { LayoutDashboard, Kanban, Plus, Settings as SettingsIcon, Search, Bell, HelpCircle, ListTodo, Map, Users, LogOut, ChevronDown, FolderPlus, Layers, X, CheckCircle, AlertCircle, Info, Menu, Loader2 } from 'lucide-react';
@@ -63,7 +64,7 @@ type ViewType = 'board' | 'backlog' | 'roadmap' | 'dashboard' | 'settings' | 'pr
 
 const AppContent: React.FC = () => {
     const { 
-        currentUser, activeProject, activeWorkspace, projects, setActiveProject, 
+        currentUser, activeProject, activeWorkspace, workspaces, setActiveWorkspace, projects, setActiveProject, 
         isAuthenticated, logout, searchQuery, setSearchQuery, notifications, 
         markNotificationRead, clearNotifications, checkPermission, isLoading
     } = useProject();
@@ -71,6 +72,7 @@ const AppContent: React.FC = () => {
     const [currentView, setCurrentView] = useState<ViewType>('board');
     const [isCreateIssueOpen, setIsCreateIssueOpen] = useState(false);
     const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+    const [isCreateWorkspaceOpen, setIsCreateWorkspaceOpen] = useState(false);
     const [isNotifOpen, setIsNotifOpen] = useState(false);
     const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -91,25 +93,29 @@ const AppContent: React.FC = () => {
     }
 
     // 3. Empty State (Logged in but no Workspace/Project)
-    if (!activeWorkspace || !activeProject) {
-        return (
+    // Note: With multi-workspace, user might have workspace but no project. 
+    // If no workspace at all, allow creating one.
+    if (!activeWorkspace) {
+         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
                 <ToastContainer />
                 <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-slate-100">
                     <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <FolderPlus className="w-8 h-8 text-indigo-600" />
+                        <Layers className="w-8 h-8 text-indigo-600" />
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-800 mb-3">Let's get started</h2>
+                    <h2 className="text-2xl font-bold text-slate-800 mb-3">No Workspace Found</h2>
                     <p className="text-slate-500 mb-8">
-                        You don't have any projects yet. Create your first project to start tracking your team's work.
+                        You aren't a member of any workspace yet. {checkPermission(Permission.CREATE_WORKSPACE) ? 'Create your first workspace to get started.' : 'Ask your admin to invite you.'}
                     </p>
                     <div className="space-y-3">
-                        <button 
-                            onClick={() => setIsCreateProjectOpen(true)}
-                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold shadow-lg shadow-indigo-200 transition-all transform active:scale-[0.98]"
-                        >
-                            Create First Project
-                        </button>
+                        {checkPermission(Permission.CREATE_WORKSPACE) && (
+                            <button 
+                                onClick={() => setIsCreateWorkspaceOpen(true)}
+                                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold shadow-lg shadow-indigo-200 transition-all transform active:scale-[0.98]"
+                            >
+                                Create Workspace
+                            </button>
+                        )}
                         <button 
                             onClick={logout}
                             className="w-full py-3 text-slate-500 hover:text-slate-700 font-medium transition-colors"
@@ -118,13 +124,20 @@ const AppContent: React.FC = () => {
                         </button>
                     </div>
                 </div>
-                {isCreateProjectOpen && <CreateProjectModal onClose={() => setIsCreateProjectOpen(false)} />}
+                {isCreateWorkspaceOpen && <CreateWorkspaceModal onClose={() => setIsCreateWorkspaceOpen(false)} />}
             </div>
         );
     }
 
+    // Handle case where workspace exists but no project selected (or exists)
+    if (!activeProject) {
+         // We render the layout but maybe overlay a "Create Project" prompt in main area
+         // However, keeping standard layout allows sidebar navigation to switch workspaces
+    }
+
     const unreadCount = notifications.filter(n => !n.read).length;
     const canCreateProject = checkPermission(Permission.CREATE_PROJECT);
+    const canCreateWorkspace = checkPermission(Permission.CREATE_WORKSPACE);
 
     const handleViewChange = (view: ViewType) => {
         setCurrentView(view);
@@ -132,6 +145,24 @@ const AppContent: React.FC = () => {
     };
 
     const renderView = () => {
+        if (!activeProject) {
+             return (
+                <div className="h-full flex flex-col items-center justify-center bg-slate-50 p-8 text-center">
+                    <FolderPlus className="w-16 h-16 text-slate-300 mb-4" />
+                    <h2 className="text-xl font-bold text-slate-700 mb-2">No Project Selected</h2>
+                    <p className="text-slate-500 mb-6 max-w-md">Select a project from the sidebar menu or create a new one to start tracking work.</p>
+                    {canCreateProject && (
+                        <button 
+                            onClick={() => setIsCreateProjectOpen(true)}
+                            className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-medium shadow-md hover:bg-indigo-700 transition-all"
+                        >
+                            Create New Project
+                        </button>
+                    )}
+                </div>
+             );
+        }
+
         switch (currentView) {
             case 'board': return <Board />;
             case 'backlog': return <Backlog />;
@@ -163,21 +194,37 @@ const AppContent: React.FC = () => {
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
             `}>
                 
-                {/* Workspace Rail (Leftmost) */}
-                <div className="w-16 bg-slate-900 flex flex-col items-center py-6 space-y-4 flex-shrink-0 z-30 h-full">
-                    <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-900/50 cursor-pointer hover:bg-indigo-500 transition-colors transform hover:scale-105 active:scale-95 duration-200">
-                        <span className="text-white font-bold text-lg select-none uppercase">{activeWorkspace.name[0]}</span>
-                    </div>
-                    <div className="w-8 h-0.5 bg-slate-700 rounded-full" />
-                    
-                    {/* Only Founders can see Add Project */}
-                    {canCreateProject && (
+                {/* Workspace Rail (Leftmost) - Dynamic Switcher */}
+                <div className="w-16 bg-slate-900 flex flex-col items-center py-6 space-y-4 flex-shrink-0 z-30 h-full overflow-y-auto custom-scrollbar no-scrollbar">
+                    {workspaces.map(ws => (
                         <div 
-                            onClick={() => setIsCreateProjectOpen(true)}
-                            className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 cursor-pointer transition-colors"
-                            title="Add Project"
+                            key={ws.id}
+                            onClick={() => setActiveWorkspace(ws.id)}
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all duration-200 group relative
+                            ${activeWorkspace.id === ws.id 
+                                ? 'bg-indigo-600 shadow-lg shadow-indigo-900/50 text-white' 
+                                : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'}`}
+                            title={ws.name}
                         >
-                            <Plus className="w-6 h-6" />
+                            <span className="font-bold text-lg select-none uppercase">{ws.name.substring(0, 2)}</span>
+                            
+                            {/* Active Indicator */}
+                            {activeWorkspace.id === ws.id && (
+                                <div className="absolute -right-1 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-l-full" />
+                            )}
+                        </div>
+                    ))}
+                    
+                    <div className="w-8 h-0.5 bg-slate-700 rounded-full my-2 opacity-50" />
+                    
+                    {/* Add Workspace Button */}
+                    {canCreateWorkspace && (
+                        <div 
+                            onClick={() => setIsCreateWorkspaceOpen(true)}
+                            className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 hover:text-emerald-400 hover:bg-slate-700 cursor-pointer transition-all border border-dashed border-slate-600 hover:border-emerald-500/50"
+                            title="Create Workspace"
+                        >
+                            <Plus className="w-5 h-5" />
                         </div>
                     )}
                     
@@ -190,56 +237,73 @@ const AppContent: React.FC = () => {
                 {/* Sidebar (Project Nav) */}
                 <div className="w-64 bg-slate-50 border-r border-slate-200 flex flex-col flex-shrink-0 h-full">
                     {/* Project Selector */}
-                    <div className="p-4 border-b border-slate-200/50">
-                        <div className="relative">
-                            <button 
-                                onClick={() => setIsProjectMenuOpen(!isProjectMenuOpen)}
-                                className="w-full flex items-center justify-between p-2 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-200 hover:shadow-sm"
-                            >
-                                <div className="flex items-center space-x-3 overflow-hidden">
-                                    <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm flex-shrink-0 text-xs">
-                                        {activeProject.key.substring(0, 3)}
+                    {activeProject ? (
+                        <div className="p-4 border-b border-slate-200/50">
+                            <div className="relative">
+                                <button 
+                                    onClick={() => setIsProjectMenuOpen(!isProjectMenuOpen)}
+                                    className="w-full flex items-center justify-between p-2 hover:bg-white rounded-lg transition-colors border border-transparent hover:border-slate-200 hover:shadow-sm"
+                                >
+                                    <div className="flex items-center space-x-3 overflow-hidden">
+                                        <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm flex-shrink-0 text-xs">
+                                            {activeProject.key.substring(0, 3)}
+                                        </div>
+                                        <div className="text-left min-w-0">
+                                            <h3 className="text-sm font-bold text-slate-800 truncate">{activeProject.name}</h3>
+                                            <p className="text-xs text-slate-500 truncate capitalize">{activeProject.type} project</p>
+                                        </div>
                                     </div>
-                                    <div className="text-left min-w-0">
-                                        <h3 className="text-sm font-bold text-slate-800 truncate">{activeProject.name}</h3>
-                                        <p className="text-xs text-slate-500 truncate capitalize">{activeProject.type} project</p>
-                                    </div>
-                                </div>
-                                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isProjectMenuOpen ? 'rotate-180' : ''}`} />
-                            </button>
+                                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isProjectMenuOpen ? 'rotate-180' : ''}`} />
+                                </button>
 
-                            {/* Dropdown */}
-                            {isProjectMenuOpen && (
-                                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-fade-in-up">
-                                    <div className="p-2 bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wider">Switch Project</div>
-                                    {projects.map(p => (
-                                        <button
-                                            key={p.id}
-                                            onClick={() => { setActiveProject(p.id); setIsProjectMenuOpen(false); }}
-                                            className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between ${p.id === activeProject.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
-                                        >
-                                            <span className="truncate mr-2">{p.name}</span>
-                                            {p.id === activeProject.id && <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full flex-shrink-0" />}
-                                        </button>
-                                    ))}
-                                    {canCreateProject && (
-                                        <button 
-                                            onClick={() => { setIsCreateProjectOpen(true); setIsProjectMenuOpen(false); }}
-                                            className="w-full text-left px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 font-medium border-t border-slate-100 flex items-center space-x-2"
-                                        >
-                                            <FolderPlus className="w-4 h-4" />
-                                            <span>Create Project</span>
-                                        </button>
-                                    )}
-                                </div>
+                                {/* Dropdown */}
+                                {isProjectMenuOpen && (
+                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-lg shadow-xl z-50 overflow-hidden animate-fade-in-up">
+                                        <div className="p-2 bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wider">Switch Project</div>
+                                        <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                                            {projects.map(p => (
+                                                <button
+                                                    key={p.id}
+                                                    onClick={() => { setActiveProject(p.id); setIsProjectMenuOpen(false); }}
+                                                    className={`w-full text-left px-4 py-2 text-sm flex items-center justify-between ${p.id === activeProject.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+                                                >
+                                                    <span className="truncate mr-2">{p.name}</span>
+                                                    {p.id === activeProject.id && <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full flex-shrink-0" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        {canCreateProject && (
+                                            <button 
+                                                onClick={() => { setIsCreateProjectOpen(true); setIsProjectMenuOpen(false); }}
+                                                className="w-full text-left px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 font-medium border-t border-slate-100 flex items-center space-x-2"
+                                            >
+                                                <FolderPlus className="w-4 h-4" />
+                                                <span>Create Project</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="p-6 text-center border-b border-slate-200/50">
+                            <p className="text-sm text-slate-500 mb-2">No active project</p>
+                            {canCreateProject && (
+                                <button 
+                                    onClick={() => setIsCreateProjectOpen(true)}
+                                    className="text-xs text-indigo-600 hover:underline font-medium"
+                                >
+                                    Create one now
+                                </button>
                             )}
                         </div>
-                    </div>
+                    )}
 
                     <div className="px-4 py-4">
                         <button 
                             onClick={() => setIsCreateIssueOpen(true)}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg shadow-md hover:shadow-lg shadow-indigo-200 transition-all flex items-center justify-center space-x-2 font-medium text-sm transform active:scale-[0.98]"
+                            disabled={!activeProject}
+                            className={`w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg shadow-md hover:shadow-lg shadow-indigo-200 transition-all flex items-center justify-center space-x-2 font-medium text-sm transform active:scale-[0.98] ${!activeProject ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
                             <Plus className="w-4 h-4" />
                             <span>Create Issue</span>
@@ -331,7 +395,7 @@ const AppContent: React.FC = () => {
                                 type="text" 
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder={`Search ${activeProject.name}...`} 
+                                placeholder={activeProject ? `Search ${activeProject.name}...` : "Search..."} 
                                 className="w-full bg-slate-50 border border-slate-200 rounded-lg py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all hover:bg-slate-100 focus:bg-white"
                             />
                         </div>
@@ -397,6 +461,7 @@ const AppContent: React.FC = () => {
 
             {isCreateIssueOpen && <CreateIssueModal onClose={() => setIsCreateIssueOpen(false)} />}
             {isCreateProjectOpen && <CreateProjectModal onClose={() => setIsCreateProjectOpen(false)} />}
+            {isCreateWorkspaceOpen && <CreateWorkspaceModal onClose={() => setIsCreateWorkspaceOpen(false)} />}
         </div>
     );
 };

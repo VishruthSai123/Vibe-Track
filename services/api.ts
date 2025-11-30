@@ -29,6 +29,15 @@ export const api = {
     return [];
   },
 
+  createWorkspace: async (workspace: Workspace): Promise<Workspace> => {
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.from('workspaces').insert(workspace).select().single();
+      handleSupabaseError(error);
+      return data as Workspace;
+    }
+    throw new Error("Supabase not configured");
+  },
+
   updateWorkspace: async (workspace: Workspace): Promise<void> => {
     if (isSupabaseConfigured) {
         const { error } = await supabase.from('workspaces').update({ members: workspace.members }).eq('id', workspace.id);
@@ -79,6 +88,10 @@ export const api = {
         sprintId: issue.sprintId || null,
         epicId: issue.epicId || null,
         assigneeId: issue.assigneeId || null,
+        // Ensure complex types are valid JSON
+        comments: issue.comments || [],
+        subtasks: issue.subtasks || [],
+        attachments: issue.attachments || []
       };
       const { data, error } = await supabase.from('issues').insert(payload).select().single();
       handleSupabaseError(error);
@@ -95,6 +108,7 @@ export const api = {
         epicId: issue.epicId || null,
         assigneeId: issue.assigneeId || null,
       };
+      // We purposefully update the whole issue object to sync the JSONB columns
       const { error } = await supabase.from('issues').update(payload).eq('id', issue.id);
       handleSupabaseError(error);
     }
@@ -172,7 +186,7 @@ export const api = {
   // --- NOTIFICATIONS ---
   getNotifications: async (userId: string): Promise<Notification[]> => {
     if (isSupabaseConfigured) {
-      const { data, error } = await supabase.from('notifications').select('*').eq('userId', userId);
+      const { data, error } = await supabase.from('notifications').select('*').eq('userId', userId).order('createdAt', { ascending: false });
       handleSupabaseError(error);
       return data as Notification[];
     }
@@ -189,21 +203,23 @@ export const api = {
   // --- STORAGE ---
   uploadFile: async (file: File): Promise<string> => {
     if (isSupabaseConfigured) {
+        // Sanitize filename
         const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `${fileName}`;
-
+        const safeName = file.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        const fileName = `${Date.now()}_${safeName}`;
+        
         const { error: uploadError } = await supabase.storage
             .from('attachments')
-            .upload(filePath, file);
+            .upload(fileName, file);
 
         if (uploadError) {
+             console.error("Storage Error:", uploadError);
              throw new Error(`Upload failed: ${uploadError.message}`);
         }
 
         const { data } = supabase.storage
             .from('attachments')
-            .getPublicUrl(filePath);
+            .getPublicUrl(fileName);
 
         return data.publicUrl;
     }

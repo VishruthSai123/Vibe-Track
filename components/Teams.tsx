@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useProject } from '../store/ProjectContext';
-import { Users, Shield, Plus, X, UserPlus } from 'lucide-react';
+import { Users, Shield, Plus, X, UserPlus, Loader2 } from 'lucide-react';
 import { Permission } from '../types';
 
 export const Teams: React.FC = () => {
@@ -9,17 +9,24 @@ export const Teams: React.FC = () => {
   const [teamToAddMember, setTeamToAddMember] = useState<string | null>(null);
   const [newTeamName, setNewTeamName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
 
   const getMemberDetails = (memberId: string) => users.find(u => u.id === memberId);
   const canManageTeams = checkPermission(Permission.MANAGE_TEAMS);
 
-  const handleCreateTeam = (e: React.FormEvent) => {
+  const handleCreateTeam = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newTeamName) return;
-      createTeam(newTeamName, selectedMembers);
-      setNewTeamName('');
-      setSelectedMembers([]);
-      setShowCreateModal(false);
+      
+      setIsCreating(true);
+      const success = await createTeam(newTeamName, selectedMembers);
+      setIsCreating(false);
+
+      if (success) {
+          setNewTeamName('');
+          setSelectedMembers([]);
+          setShowCreateModal(false);
+      }
   };
 
   const handleAddMember = (userId: string) => {
@@ -205,7 +212,7 @@ export const Teams: React.FC = () => {
                     </div>
                     <div className="mb-6">
                         <label className="block text-sm font-medium text-slate-700 mb-2">Select Members</label>
-                        <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg">
+                        <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-lg custom-scrollbar">
                             {users.map(u => (
                                 <div 
                                     key={u.id}
@@ -238,8 +245,10 @@ export const Teams: React.FC = () => {
                         </button>
                         <button 
                             type="submit"
-                            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
+                            disabled={isCreating}
+                            className={`px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors flex items-center ${isCreating ? 'opacity-70 cursor-not-allowed' : ''}`}
                         >
+                            {isCreating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                             Create Team
                         </button>
                     </div>

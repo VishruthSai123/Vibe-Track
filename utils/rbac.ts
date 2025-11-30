@@ -4,6 +4,7 @@ import { UserRole, Permission } from '../types';
 // The centralized Matrix defining what each role can do
 const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   [UserRole.FOUNDER]: [
+    Permission.CREATE_WORKSPACE,
     Permission.CREATE_PROJECT,
     Permission.DELETE_PROJECT,
     Permission.MANAGE_ACCESS,
@@ -25,7 +26,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     Permission.ASSIGN_TASK,
     Permission.UPDATE_TASK_STATUS,
     Permission.MANAGE_TEAMS,
-    // Cannot create/delete projects or manage global access
+    // Cannot create workspaces or delete projects
   ],
   [UserRole.CAO]: [
     Permission.CREATE_SPRINT,
@@ -54,7 +55,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     Permission.ASSIGN_TASK,
     Permission.UPDATE_TASK_STATUS,
     Permission.MANAGE_TEAMS,
-    // Cannot create/delete projects
+    // Cannot create workspaces
   ],
   [UserRole.TEAM_LEAD]: [
     Permission.CREATE_TASK,
